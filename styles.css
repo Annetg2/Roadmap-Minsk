@@ -1,0 +1,334 @@
+/* ============ дизайн-токены ============ */
+:root{
+  --ink:#0b0f16;
+  --glass:rgba(10,14,22,.6);
+  --text:#f4f1e9;
+  --muted:rgba(244,241,233,.66);
+  --accent:#e9a53f;
+  --line:rgba(244,241,233,.14);
+  --danger:#e06666;
+  --r-card:18px;
+  --font-text:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:var(--font-text);
+  color:var(--text);
+  background:var(--ink);
+  line-height:1.55;
+}
+.mono{font-family:var(--font-mono)}
+button{font:inherit}
+
+#bg{
+  position:fixed; inset:0; z-index:-1;
+  background-size:cover; background-position:center;
+}
+/* сквозная тень слева — от hero до конца страницы */
+#bg::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,
+    rgba(11,15,22,.92) 0%, rgba(11,15,22,.72) 30%,
+    rgba(11,15,22,.35) 55%, rgba(11,15,22,0) 78%);
+}
+
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* ============ панель управления ============ */
+.controls{
+  position:fixed; top:16px; right:16px; z-index:640;
+  display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;
+  max-width:calc(100vw - 32px);
+}
+.pill{
+  font-size:.85rem; color:var(--text);
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  border:1px solid var(--line); border-radius:999px;
+  padding:.5em 1.1em; cursor:pointer;
+}
+.pill:hover{border-color:var(--accent)}
+.pill.active{background:var(--accent); color:var(--ink); border-color:var(--accent); font-weight:600}
+.pill.small{font-size:.78rem; padding:.35em .9em}
+
+/* ============ hero (выравнивание влево) ============ */
+.hero{
+  min-height:62vh;
+  display:flex; align-items:flex-end;
+  padding:96px 48px 40px;
+}
+.hero-inner{max-width:820px; margin:0; width:100%}
+.eyebrow{
+  letter-spacing:.22em; text-transform:uppercase;
+  font-size:.8rem; color:var(--accent); margin:0 0 14px;
+}
+h1{
+  font-size:clamp(2rem,5.5vw,3.4rem); font-weight:700;
+  letter-spacing:-.02em; line-height:1.12; margin:0 0 14px;
+}
+.dates{color:var(--muted); font-size:.95rem; margin:0 0 18px}
+.subtitle{color:var(--muted); max-width:580px; margin:0}
+
+/* ============ каркас: левая колонка ============ */
+main{max-width:820px; margin:0; padding:8px 48px 130px; display:grid; gap:56px}
+.section-title{
+  font-size:1rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  border-left:3px solid var(--accent);
+  background:linear-gradient(90deg, rgba(11,15,22,.75), rgba(11,15,22,0) 70%);
+  padding:10px 16px; margin:0 0 18px; border-radius:0 8px 8px 0;
+}
+.card{
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  border:1px solid var(--line); border-radius:var(--r-card);
+  padding:28px 30px;
+}
+
+/* ============ маршрут по дням ============ */
+#days{display:grid; gap:24px}
+.day-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px}
+.day-title{font-size:1.2rem; font-weight:600; margin:0}
+.stops{position:relative; margin-top:18px}
+.stops::before{
+  content:''; position:absolute; left:7px; top:20px; bottom:20px;
+  width:2px; background:var(--accent); opacity:.45;
+}
+.stop{
+  position:relative; padding:14px 0 14px 34px;
+  display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+}
+.stop::before{
+  content:''; position:absolute; left:3px; top:21px;
+  width:8px; height:8px; border-radius:50%;
+  background:var(--ink); border:2px solid var(--accent);
+}
+.stop-time{color:var(--accent); font-family:var(--font-mono); font-size:.9rem}
+.stop-name{font-weight:600}
+.stop-note{flex-basis:100%; color:var(--muted); font-size:.9rem}
+.stop .row-controls{margin-left:auto}
+.add-stop{margin-top:14px}
+
+/* фото и мини-карта события */
+.stop-media{flex-basis:100%; display:flex; flex-wrap:wrap; gap:12px; margin-top:10px}
+.stop-photo{
+  flex:1 1 280px; max-width:440px; min-width:0;
+  max-height:300px; object-fit:cover;
+  border-radius:12px; border:1px solid var(--line);
+}
+.stop-map{
+  flex:1 1 280px; max-width:440px; height:230px;
+  border-radius:12px; border:1px solid var(--line);
+  overflow:hidden; position:relative; z-index:0;
+}
+.stop-tools{
+  flex-basis:100%; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px;
+}
+.stop-geo-wrap{display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap}
+.stop-geo{
+  min-width:16ch; font-size:.85rem; color:var(--muted);
+  border-bottom:1px dashed var(--line); padding:2px 6px;
+}
+
+.row-controls{gap:4px}
+.ctl{
+  font-size:.8rem; line-height:1; color:var(--muted);
+  background:none; border:1px solid var(--line); border-radius:8px;
+  width:26px; height:26px; cursor:pointer; flex:none;
+}
+.ctl:hover{color:var(--text); border-color:var(--accent)}
+.ctl.danger:hover{color:var(--danger); border-color:var(--danger)}
+
+/* ============ карта ============ */
+#map{
+  height:480px; border-radius:var(--r-card);
+  border:1px solid var(--line); overflow:hidden;
+  background:var(--glass);
+  position:relative; z-index:0; /* изолирует z-index слоёв Leaflet */
+}
+#map.fallback{
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  padding:24px;
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+}
+.fallback-title{font-weight:600; margin:0 0 6px}
+.fallback-note{margin:0; color:var(--muted); font-size:.9rem}
+
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px}
+.chip{
+  font-size:.85rem; color:var(--text);
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  border:1px solid var(--line); border-radius:999px;
+  padding:.4em 1em; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.chip:hover{border-color:var(--accent)}
+.chip-x{color:var(--danger)}
+
+/* редактор точек (режим редактирования) */
+#points-editor{margin-top:14px}
+.point-row{
+  display:flex; align-items:baseline; gap:10px;
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  border:1px solid var(--line); border-radius:12px;
+  padding:8px 14px;
+}
+.point-name{font-weight:600}
+.point-coords{color:var(--muted); font-size:.8rem}
+.point-controls{margin-left:auto; display:inline-flex; gap:4px}
+.points-foot{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:4px}
+.points-hint{color:var(--muted); font-size:.8rem}
+
+/* маркеры Leaflet (divIcon) */
+.poi{background:none; border:none}
+.marker{
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  transform:translate(-50%,-100%); width:max-content; cursor:pointer;
+}
+.marker-label{
+  font-size:11px; color:var(--text); background:var(--glass);
+  border:1px solid var(--line); padding:1px 7px; border-radius:6px;
+  white-space:nowrap;
+}
+.marker-pin{
+  width:14px; height:14px; border-radius:50% 50% 50% 0;
+  background:var(--accent); transform:rotate(-45deg);
+  border:2px solid var(--ink);
+}
+.marker-form-inline{display:flex; gap:6px; align-items:center}
+.marker-form-inline input{
+  width:150px; font:inherit; font-size:.85rem;
+  background:var(--ink); color:var(--text);
+  border:1px solid var(--line); border-radius:8px; padding:4px 8px;
+}
+
+/* тёмная тема для Leaflet */
+.leaflet-container{background:#131a28; font-family:var(--font-text)}
+.leaflet-popup-content-wrapper, .leaflet-popup-tip{
+  background:#131a28; color:var(--text); border:1px solid var(--line);
+}
+.leaflet-popup-content{margin:10px 12px}
+.leaflet-bar a{background:#131a28; color:var(--text); border-color:var(--line)}
+.leaflet-bar a:hover{background:#1b2436}
+.leaflet-container .leaflet-control-attribution{
+  background:rgba(10,14,22,.7); color:var(--muted); font-size:10px;
+}
+.leaflet-control-attribution a{color:var(--muted)}
+
+/* ============ бюджет ============ */
+.table-wrap{overflow-x:auto}
+.budget{width:100%; border-collapse:collapse; min-width:430px}
+.budget th{
+  text-align:left; font-size:.72rem; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  padding:6px 10px 10px; border-bottom:1px solid var(--line);
+}
+.budget td{padding:10px; border-bottom:1px solid var(--line); vertical-align:baseline}
+.budget th.num, .budget td.num{text-align:right}
+.del-col{width:36px; text-align:right}
+.badge{
+  display:inline-block; font-size:.78rem; color:var(--muted);
+  border:1px solid var(--line); border-radius:999px; padding:1px 10px;
+}
+.cats .cat-assigned{display:inline-flex; flex-wrap:wrap; gap:4px}
+/* переключатели категорий в строке (режим редактирования) */
+.cat-toggle{cursor:pointer; opacity:.4; filter:grayscale(.55); user-select:none}
+.cat-toggle.on{opacity:1; filter:none}
+.cat-toggle:hover{opacity:.85}
+/* редактор категорий */
+#cat-editor{
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  margin-top:16px; padding-top:14px; border-top:1px solid var(--line);
+}
+.cat-editor-title{color:var(--muted); font-size:.85rem}
+.cat-edit-row{
+  display:inline-flex; align-items:center; gap:6px;
+  border:1px solid var(--line); border-radius:999px; padding:3px 8px;
+}
+.cat-edit-name{font-size:.85rem; padding:0 4px}
+.cat-color{
+  width:22px; height:22px; padding:0; border:none; background:none; cursor:pointer;
+  border-radius:50%; overflow:hidden;
+}
+.cat-color::-webkit-color-swatch-wrapper{padding:0}
+.cat-color::-webkit-color-swatch{border:1px solid var(--line); border-radius:50%}
+
+.amount{font-family:var(--font-mono)}
+.cur{
+  font-family:var(--font-mono); font-size:.85rem; color:var(--text);
+  background:none; border:1px solid var(--line); border-radius:999px;
+  padding:2px 10px; cursor:pointer;
+}
+.cur:hover{border-color:var(--accent)}
+.rate{color:var(--muted); font-size:.9rem; margin:18px 0 6px}
+#rate{color:var(--text)}
+.totals{border-top:1px solid var(--line); padding-top:14px; margin-top:8px}
+.total-main{font-size:1.25rem; font-weight:600}
+.total-sub{color:var(--muted)}
+
+/* ============ панель фона ============ */
+.bg-panel{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.bg-panel input[type=url]{
+  flex:1 1 240px; font:inherit; font-size:.9rem;
+  background:rgba(255,255,255,.04); color:var(--text);
+  border:1px solid var(--line); border-radius:999px; padding:.5em 1.1em;
+}
+
+/* ============ режим редактирования ============ */
+.edit-only{display:none}
+body.editing section.edit-only{display:block}
+body.editing div.edit-only{display:block}
+body.editing #edit-banner{display:block}
+body.editing button.edit-only{display:inline-block}
+body.editing span.edit-only{display:inline}
+body.editing .row-controls.edit-only{display:inline-flex}
+body.editing .stop-tools.edit-only{display:flex}
+body.editing #points-editor.edit-only{display:grid; gap:8px}
+body.editing .cat-picker.edit-only{display:inline-flex; flex-wrap:wrap; gap:4px}
+body.editing #cat-editor.edit-only{display:flex}
+body.editing .cat-assigned{display:none} /* в редактировании вместо них — переключатели */
+
+#edit-banner{
+  position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:640;
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  border:1px solid var(--accent); border-radius:999px;
+  padding:10px 22px; font-size:.85rem;
+  max-width:calc(100vw - 32px); width:max-content; text-align:center;
+}
+body.editing .editable{outline:1px dashed var(--accent); outline-offset:3px; border-radius:3px; cursor:text}
+body.editing .editable:focus{outline-style:solid}
+
+/* ============ адаптив и доступность ============ */
+@media (max-width:560px){
+  .hero{padding:80px 16px 28px; min-height:48vh}
+  main{padding:8px 12px 140px; gap:36px}
+  .card{padding:16px 14px}
+  #map{height:340px}
+  .controls{top:8px; right:8px; gap:5px}
+  .pill{font-size:.78rem; padding:.4em .8em}
+  /* тач-мишени крупнее */
+  .ctl{width:32px; height:32px; font-size:.9rem}
+  /* фото и мини-карта — во всю ширину, друг под другом */
+  .stop-photo, .stop-map{flex:1 1 100%; max-width:none}
+  .stop-map{height:200px}
+  .stop{padding-left:26px}
+  .stops::before{left:5px}
+  .stop::before{left:1px}
+  .day-head{flex-wrap:wrap}
+  .stop .row-controls{margin-left:auto}
+  .point-row{flex-wrap:wrap; row-gap:4px}
+  .point-controls{margin-left:auto}
+  .total-main{font-size:1.1rem}
+  #edit-banner{font-size:.75rem; padding:8px 14px; bottom:10px}
+  .bg-panel input[type=url]{flex-basis:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important; animation:none !important}
+  html{scroll-behavior:auto}
+}
