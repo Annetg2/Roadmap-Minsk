@@ -8,52 +8,6 @@ const OSM_ATTR = '&copy; OpenStreetMap';
 
 const LS_KEY = 'travel-roadmap-v2';
 
-/* ---------- фон по умолчанию: стилизованный «вечерний город» (SVG) ---------- */
-const DEFAULT_BG = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice">' +
-  '<defs>' +
-  '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">' +
-  '<stop offset="0" stop-color="#0a0e1a"/><stop offset=".5" stop-color="#141e33"/>' +
-  '<stop offset=".8" stop-color="#3d2f45"/><stop offset="1" stop-color="#7c4a2c"/>' +
-  '</linearGradient>' +
-  '<pattern id="w1" width="18" height="26" patternUnits="userSpaceOnUse">' +
-  '<rect x="4" y="8" width="7" height="10" fill="#e9a53f" opacity=".65"/></pattern>' +
-  '<pattern id="w2" width="24" height="32" patternUnits="userSpaceOnUse">' +
-  '<rect x="7" y="10" width="8" height="12" fill="#f0b45a" opacity=".4"/></pattern>' +
-  '</defs>' +
-  '<rect width="1600" height="900" fill="url(#sky)"/>' +
-  '<circle cx="1230" cy="170" r="70" fill="#f4f1e9" opacity=".07"/>' +
-  '<circle cx="1230" cy="170" r="42" fill="#f4f1e9" opacity=".85"/>' +
-  '<g fill="#131a2b">' +
-  '<rect x="0" y="500" width="130" height="400"/><rect x="150" y="430" width="90" height="470"/>' +
-  '<rect x="260" y="470" width="140" height="430"/><rect x="420" y="380" width="80" height="520"/>' +
-  '<rect x="520" y="450" width="120" height="450"/><rect x="660" y="400" width="100" height="500"/>' +
-  '<rect x="780" y="360" width="70" height="540"/><rect x="870" y="440" width="130" height="460"/>' +
-  '<rect x="1020" y="390" width="90" height="510"/><rect x="1130" y="460" width="120" height="440"/>' +
-  '<rect x="1270" y="410" width="80" height="490"/><rect x="1370" y="470" width="110" height="430"/>' +
-  '<rect x="1500" y="420" width="100" height="480"/>' +
-  '</g>' +
-  '<g fill="#0a0e16">' +
-  '<rect x="60" y="600" width="170" height="300"/><rect x="270" y="560" width="120" height="340"/>' +
-  '<rect x="430" y="620" width="150" height="280"/><rect x="620" y="540" width="110" height="360"/>' +
-  '<rect x="770" y="590" width="160" height="310"/><rect x="970" y="550" width="120" height="350"/>' +
-  '<rect x="1120" y="610" width="150" height="290"/><rect x="1310" y="560" width="120" height="340"/>' +
-  '<rect x="1460" y="620" width="140" height="280"/>' +
-  '</g>' +
-  '<g opacity=".85">' +
-  '<rect x="72" y="616" width="146" height="268" fill="url(#w1)"/>' +
-  '<rect x="282" y="576" width="96" height="308" fill="url(#w2)"/>' +
-  '<rect x="442" y="636" width="126" height="248" fill="url(#w1)"/>' +
-  '<rect x="632" y="556" width="86" height="328" fill="url(#w2)"/>' +
-  '<rect x="782" y="606" width="136" height="278" fill="url(#w1)"/>' +
-  '<rect x="982" y="566" width="96" height="318" fill="url(#w2)"/>' +
-  '<rect x="1132" y="626" width="126" height="258" fill="url(#w1)"/>' +
-  '<rect x="1322" y="576" width="96" height="308" fill="url(#w2)"/>' +
-  '<rect x="1472" y="636" width="116" height="248" fill="url(#w1)"/>' +
-  '</g>' +
-  '</svg>'
-);
-
 /* ---------- демо-состояние (Минск) ---------- */
 function demoState(){
   return {
@@ -62,7 +16,7 @@ function demoState(){
       eyebrow2:'МИНСК',
       title:'Road Map поездки',
       dates:'31 июля — 3 августа 2026',
-      subtitle:'Четыре дня в Минске: старый город, советский модернизм и кофейни Октябрьской. Включите режим редактирования — и соберите свой маршрут.'
+      subtitle:'Четыре дня в Минске: старый город, советский модернизм и кофейни Октябрьской. Нажмите «Править» — и соберите свой маршрут.'
     },
     days:[
       {title:'День 1 · Прибытие', stops:[
@@ -88,6 +42,7 @@ function demoState(){
         {time:'16:20', name:'Поезд домой', note:'Вокзал, посадка за 30 минут', photo:'', geo:''}
       ]}
     ],
+    activeDay:0,
     points:[
       {name:'Национальная библиотека', lat:53.9316, lng:27.6462},
       {name:'Верхний город', lat:53.9045, lng:27.5561},
@@ -123,6 +78,7 @@ function migrateState(s){
   (s.budget || []).forEach(r => {
     if(!Array.isArray(r.cats)) r.cats = r.cat ? [String(r.cat)] : [];
   });
+  if(typeof s.activeDay !== 'number' || s.activeDay < 0) s.activeDay = 0;
   return s;
 }
 
@@ -142,6 +98,7 @@ let map = null;
 let markers = [];
 let miniMaps = [];
 let pendingPhotoStop = null;
+const expandedStops = new WeakSet(); // раскрытые карточки событий (в рамках сессии)
 
 let saveTimer = null;
 function save(){
@@ -209,7 +166,7 @@ function rowControls(arr, i, rerender, confirmMsg){
     const b = el('button', 'ctl' + (danger ? ' danger' : ''), label);
     b.type = 'button';
     b.title = title;
-    b.onclick = fn;
+    b.onclick = e => { e.stopPropagation(); fn(); };
     box.append(b);
   };
   mk('↑', 'Переместить выше', () => {
@@ -227,11 +184,17 @@ function rowControls(arr, i, rerender, confirmMsg){
 
 /* ---------- фон ---------- */
 function applyBg(){
-  const u = state.bg || DEFAULT_BG;
-  $('#bg').style.backgroundImage = 'url("' + u.replace(/"/g, '%22') + '")';
+  const b = $('#bg');
+  if(state.bg){
+    b.style.backgroundImage = 'url("' + state.bg.replace(/"/g, '%22') + '")';
+    b.classList.add('has-img');
+  }else{
+    b.style.backgroundImage = 'none';
+    b.classList.remove('has-img');
+  }
 }
 
-/* ---------- hero и курс (статичные editable, привязка один раз) ---------- */
+/* ---------- шапка и курс (статичные editable, привязка один раз) ---------- */
 function renderStatics(){
   $('#eyebrow1').textContent = state.hero.eyebrow1;
   $('#eyebrow2').textContent = state.hero.eyebrow2;
@@ -292,111 +255,189 @@ function geocodeStop(stop){
     .catch(() => alert('Геокодер недоступен — проверьте интернет.'));
 }
 
-/* ---------- маршрут по дням ---------- */
+/* ---------- расписание: табы дней и карточки событий ---------- */
+function clampActiveDay(){
+  if(state.activeDay >= state.days.length) state.activeDay = Math.max(0, state.days.length - 1);
+  if(state.activeDay < 0) state.activeDay = 0;
+}
+
+function renderTabs(){
+  const wrap = $('#day-tabs');
+  wrap.textContent = '';
+  state.days.forEach((d, i) => {
+    const t = el('button', 'day-tab' + (i === state.activeDay ? ' on' : ''), 'День ' + (i + 1));
+    t.type = 'button';
+    t.onclick = () => { state.activeDay = i; save(); renderDays(); };
+    wrap.append(t);
+  });
+  if(editing){
+    const add = el('button', 'day-tab add', '＋');
+    add.type = 'button';
+    add.title = 'Добавить день';
+    add.onclick = () => {
+      state.days.push({title:'День ' + (state.days.length + 1), stops:[{time:'12:00', name:'Новое место', note:'Заметка', photo:'', geo:''}]});
+      state.activeDay = state.days.length - 1;
+      save(); renderDays();
+    };
+    wrap.append(add);
+  }
+}
+
 function renderDays(){
   miniMaps.forEach(m => m.remove());
   miniMaps = [];
   const pendingMini = [];
+  clampActiveDay();
+  renderTabs();
 
-  const wrap = $('#days');
-  wrap.textContent = '';
-  state.days.forEach((day, di) => {
-    const card = el('article', 'card day');
+  const headWrap = $('#day-head');
+  headWrap.textContent = '';
+  const stopsWrap = $('#stops');
+  stopsWrap.textContent = '';
 
-    const head = el('div', 'day-head');
-    head.append(editableEl('h3', 'day-title', () => day.title, v => day.title = v));
-    head.append(rowControls(state.days, di, renderDays, 'Удалить день целиком вместе со всеми пунктами?'));
+  const day = state.days[state.activeDay];
+  if(!day){
+    headWrap.append(el('p', 'stop-note', 'Дней пока нет — нажмите «Править» и добавьте первый.'));
+    return;
+  }
+
+  // заголовок дня + управление днём
+  headWrap.append(editableEl('h2', 'day-heading', () => day.title, v => day.title = v));
+  if(editing){
+    const ctl = el('span', 'row-controls edit-only');
+    const mk = (label, title, fn, danger) => {
+      const b = el('button', 'ctl' + (danger ? ' danger' : ''), label);
+      b.type = 'button'; b.title = title; b.onclick = fn;
+      ctl.append(b);
+    };
+    mk('↑', 'Сдвинуть день раньше', () => {
+      const i = state.activeDay;
+      if(i > 0){ [state.days[i-1], state.days[i]] = [state.days[i], state.days[i-1]]; state.activeDay = i - 1; save(); renderDays(); }
+    });
+    mk('↓', 'Сдвинуть день позже', () => {
+      const i = state.activeDay;
+      if(i < state.days.length - 1){ [state.days[i+1], state.days[i]] = [state.days[i], state.days[i+1]]; state.activeDay = i + 1; save(); renderDays(); }
+    });
+    mk('✕', 'Удалить день', () => {
+      if(!confirm('Удалить день целиком вместе со всеми событиями?')) return;
+      state.days.splice(state.activeDay, 1);
+      save(); renderDays();
+    }, true);
+    headWrap.append(ctl);
+  }
+
+  // события активного дня
+  day.stops.forEach((stop, si) => {
+    const isOpen = expandedStops.has(stop);
+    const miniRef = {mm:null, marker:null, label:null, geoInp:null};
+
+    const row = el('div', 'event-row');
+    row.append(el('div', 'tl-dot' + (isOpen ? ' on' : '')));
+
+    const card = el('article', 'event-card' + (isOpen ? ' open' : ''));
+    const head = el('div', 'event-head');
+    const meta = el('div', 'event-meta');
+    meta.append(editableEl('div', 'stop-time mono', () => stop.time, v => stop.time = v));
+    meta.append(editableEl('div', 'stop-name', () => stop.name, v => {
+      stop.name = v;
+      if(miniRef.label) miniRef.label.textContent = v; // подпись на мини-карте — сразу
+    }));
+    meta.append(editableEl('div', 'stop-note', () => stop.note, v => stop.note = v));
+    head.append(meta);
+
+    const right = el('div', 'event-headright');
+    right.append(rowControls(day.stops, si, renderDays));
+    const toggle = () => {
+      if(isOpen) expandedStops.delete(stop); else expandedStops.add(stop);
+      renderDays();
+    };
+    const chev = el('button', 'chevron', isOpen ? '▲' : '▼');
+    chev.type = 'button';
+    chev.title = isOpen ? 'Свернуть' : 'Развернуть';
+    chev.onclick = e => { e.stopPropagation(); toggle(); };
+    right.append(chev);
+    head.append(right);
+    head.onclick = () => { if(!editing) toggle(); }; // в редактировании клик по тексту — правка
     card.append(head);
 
-    const stops = el('div', 'stops');
-    day.stops.forEach((stop, si) => {
-      const s = el('div', 'stop');
-      const miniRef = {mm:null, marker:null, label:null, geoInp:null};
-      s.append(editableEl('span', 'stop-time', () => stop.time, v => stop.time = v));
-      s.append(editableEl('span', 'stop-name', () => stop.name, v => {
-        stop.name = v;
-        if(miniRef.label) miniRef.label.textContent = v; // подпись на мини-карте обновляется сразу
-      }));
-      s.append(rowControls(day.stops, si, renderDays));
-      s.append(editableEl('div', 'stop-note', () => stop.note, v => stop.note = v));
+    if(isOpen){
+      const body = el('div', 'event-body');
 
-      // фото и мини-карта
-      const media = el('div', 'stop-media');
+      // фото
       if(stop.photo){
         const img = document.createElement('img');
         img.className = 'stop-photo';
         img.alt = stop.name;
         img.src = stop.photo;
-        media.append(img);
+        body.append(img);
+        if(editing){
+          const tools = el('div', 'photo-tools');
+          const rep = el('button', 'pill small', '📷 Заменить фото');
+          rep.type = 'button';
+          rep.onclick = () => { pendingPhotoStop = stop; $('#stop-photo-file').click(); };
+          const rm = el('button', 'pill small', '✕ Убрать фото');
+          rm.type = 'button';
+          rm.onclick = () => { stop.photo = ''; save(); renderDays(); };
+          tools.append(rep, rm);
+          body.append(tools);
+        }
+      }else if(editing){
+        const slot = el('button', 'slot', 'фото · ' + stop.name);
+        slot.type = 'button';
+        slot.title = 'Добавить фото события';
+        slot.onclick = () => { pendingPhotoStop = stop; $('#stop-photo-file').click(); };
+        body.append(slot);
       }
+
+      // мини-карта
       const coords = parseGeo(stop.geo);
       if(coords && window.L){
         const mapDiv = el('div', 'stop-map');
-        media.append(mapDiv);
+        body.append(mapDiv);
         pendingMini.push({elm:mapDiv, stop, coords, ref:miniRef});
-      }
-      if(media.children.length) s.append(media);
-
-      // инструменты события (только в режиме редактирования)
-      const tools = el('div', 'stop-tools edit-only');
-      const photoBtn = el('button', 'pill small', stop.photo ? '📷 Заменить фото' : '📷 Добавить фото');
-      photoBtn.type = 'button';
-      photoBtn.onclick = () => { pendingPhotoStop = stop; $('#stop-photo-file').click(); };
-      tools.append(photoBtn);
-      if(stop.photo){
-        const rm = el('button', 'pill small', '✕ Убрать фото');
-        rm.type = 'button';
-        rm.onclick = () => { stop.photo = ''; save(); renderDays(); };
-        tools.append(rm);
-      }
-      const geoWrap = el('span', 'stop-geo-wrap');
-      geoWrap.append(el('span', null, '📍'));
-      const geoInp = editableEl('span', 'stop-geo mono', () => stop.geo || '', v => stop.geo = v.trim());
-      geoInp.title = 'Координаты «53.9316, 27.6462» — или нажмите «Найти»';
-      miniRef.geoInp = geoInp;
-      geoInp.addEventListener('blur', () => {
-        const c = parseGeo(stop.geo);
-        if(c && miniRef.mm){
-          miniRef.marker.setLatLng(c);
-          miniRef.mm.setView(c);
-        }else if(c && !miniRef.mm){
-          renderDays(); // появились координаты — показать мини-карту
-        }else if(!c && miniRef.mm && !(stop.geo || '').trim()){
-          renderDays(); // координаты стёрли — убрать мини-карту
-        }
-      });
-      geoWrap.append(geoInp);
-      const find = el('button', 'pill small', '🔍 Найти');
-      find.type = 'button';
-      find.title = 'Найти координаты по названию места';
-      find.onclick = () => geocodeStop(stop);
-      geoWrap.append(find);
-      if(!coords){
-        const pick = el('button', 'pill small', '📌 Метка на карте');
-        pick.type = 'button';
-        pick.title = 'Поставить метку в центре города и уточнить кликом или перетаскиванием';
-        pick.onclick = () => {
+      }else if(editing){
+        const slot = el('button', 'slot', 'карта · ' + stop.name);
+        slot.type = 'button';
+        slot.title = 'Поставить метку в центре города — дальше уточните кликом или перетаскиванием';
+        slot.onclick = () => {
           stop.geo = state.map.lat.toFixed(5) + ', ' + state.map.lng.toFixed(5);
           save(); renderDays();
         };
-        geoWrap.append(pick);
+        body.append(slot);
       }
-      tools.append(geoWrap);
-      s.append(tools);
 
-      stops.append(s);
-    });
-    card.append(stops);
+      // гео-инструменты
+      if(editing){
+        const geoWrap = el('div', 'stop-geo-wrap');
+        geoWrap.append(el('span', null, '📍'));
+        const geoInp = editableEl('span', 'stop-geo mono', () => stop.geo || '', v => stop.geo = v.trim());
+        geoInp.title = 'Координаты «53.9316, 27.6462» — или нажмите «Найти»';
+        miniRef.geoInp = geoInp;
+        geoInp.addEventListener('blur', () => {
+          const c = parseGeo(stop.geo);
+          if(c && miniRef.mm){
+            miniRef.marker.setLatLng(c);
+            miniRef.mm.setView(c);
+          }else if(c && !miniRef.mm){
+            renderDays(); // появились координаты — показать мини-карту
+          }else if(!c && miniRef.mm && !(stop.geo || '').trim()){
+            renderDays(); // координаты стёрли — убрать мини-карту
+          }
+        });
+        geoWrap.append(geoInp);
+        const find = el('button', 'pill small', '🔍 Найти');
+        find.type = 'button';
+        find.title = 'Найти координаты по названию места';
+        find.onclick = () => geocodeStop(stop);
+        geoWrap.append(find);
+        body.append(geoWrap);
+      }
 
-    const add = el('button', 'pill add-stop edit-only', '＋ Добавить пункт');
-    add.type = 'button';
-    add.onclick = () => {
-      day.stops.push({time:'12:00', name:'Новое место', note:'Заметка', photo:'', geo:''});
-      save(); renderDays();
-    };
-    card.append(add);
+      if(body.children.length) card.append(body);
+    }
 
-    wrap.append(card);
+    row.append(card);
+    stopsWrap.append(row);
   });
 
   pendingMini.forEach(p => initMiniMap(p.elm, p.stop, p.coords, p.ref));
@@ -566,7 +607,7 @@ function renderChips(){
   renderPointsEditor();
 }
 
-/* видимый редактор точек (режим редактирования): переименовать, показать, удалить, добавить */
+/* видимый редактор точек (режим редактирования) */
 function renderPointsEditor(){
   const wrap = $('#points-editor');
   wrap.textContent = '';
@@ -689,11 +730,17 @@ function setEditing(on){
     if(on) n.setAttribute('contenteditable', 'plaintext-only');
     else n.removeAttribute('contenteditable');
   });
-  const b = $('#btn-edit');
-  b.textContent = on ? '✓ Готово' : '✎ Редактировать';
+  const b = $('#edit-fab');
+  b.textContent = on ? '✓ Готово' : '✎ Править';
   b.classList.toggle('active', on);
   renderMarkers(); // перетаскивание и попап-форма — только в режиме редактирования
-  renderDays();    // мини-карты становятся кликабельными/перетаскиваемыми
+  renderDays();    // слоты фото/карты и интерактивность мини-карт
+}
+
+/* ---------- меню ---------- */
+function toggleMenu(open){
+  $('#menu-overlay').hidden = !open;
+  $('#menu-btn').classList.toggle('open', open);
 }
 
 /* ---------- экспорт / импорт / сброс ---------- */
@@ -765,17 +812,42 @@ bindEditable(rateEl, v => {
 });
 rateEl.addEventListener('blur', () => { rateEl.textContent = fmt(state.rate); });
 
-$('#btn-edit').onclick = () => setEditing(!editing);
-$('#btn-export').onclick = exportJson;
-$('#btn-import').onclick = () => $('#import-file').click();
-$('#import-file').addEventListener('change', importJson);
-$('#btn-reset').onclick = resetAll;
+$('#edit-fab').onclick = () => setEditing(!editing);
 
-$('#add-day').onclick = () => {
-  state.days.push({
-    title:'День ' + (state.days.length + 1) + ' · Новый день',
-    stops:[{time:'12:00', name:'Новое место', note:'Заметка', photo:'', geo:''}]
-  });
+/* бургер-меню */
+$('#menu-btn').onclick = () => toggleMenu($('#menu-overlay').hidden);
+$('#menu-overlay').addEventListener('click', e => {
+  if(e.target === $('#menu-overlay')) toggleMenu(false);
+});
+document.querySelectorAll('.menu-item').forEach(b => {
+  b.onclick = () => {
+    toggleMenu(false);
+    const act = b.dataset.act;
+    if(act === 'settings'){
+      const s = $('#settings-section');
+      s.hidden = false;
+      s.scrollIntoView({behavior:'smooth', block:'start'});
+    }else if(act === 'map'){
+      $('#map-section').scrollIntoView({behavior:'smooth', block:'start'});
+    }else if(act === 'reset'){
+      resetAll();
+    }else if(act === 'import'){
+      $('#import-file').click();
+    }else if(act === 'export'){
+      exportJson();
+    }
+  };
+});
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && !$('#menu-overlay').hidden) toggleMenu(false);
+});
+
+$('#import-file').addEventListener('change', importJson);
+
+$('#add-stop').onclick = () => {
+  const day = state.days[state.activeDay];
+  if(!day) return;
+  day.stops.push({time:'12:00', name:'Новое место', note:'Заметка', photo:'', geo:''});
   save(); renderDays();
 };
 $('#add-row').onclick = () => {
@@ -796,7 +868,7 @@ $('#stop-photo-file').addEventListener('change', e => {
   });
 });
 
-/* фон города */
+/* фон города (Настройки) */
 $('#bg-apply-url').onclick = () => {
   const u = $('#bg-url').value.trim();
   if(!u) return;

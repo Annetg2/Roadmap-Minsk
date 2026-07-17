@@ -17,43 +17,36 @@
 <body>
 <div id="bg" aria-hidden="true"></div>
 
-<nav class="controls" aria-label="Управление">
-  <button id="btn-edit" class="pill" type="button">✎ Редактировать</button>
-  <button id="btn-export" class="pill" type="button">⇩ Экспорт</button>
-  <button id="btn-import" class="pill" type="button">⇪ Импорт</button>
-  <button id="btn-reset" class="pill" type="button">↺ Сброс</button>
-  <input type="file" id="import-file" accept=".json,application/json" hidden>
-  <input type="file" id="stop-photo-file" accept="image/*" hidden>
-</nav>
+<button id="menu-btn" type="button" aria-label="Меню"><span></span><span></span><span></span></button>
+<div id="menu-overlay" hidden>
+  <nav class="menu" aria-label="Главное меню">
+    <button class="menu-item" type="button" data-act="settings">Настройки</button>
+    <button class="menu-item" type="button" data-act="map">Карта событий</button>
+    <button class="menu-item" type="button" data-act="reset">Сброс</button>
+    <button class="menu-item" type="button" data-act="import">Импорт</button>
+    <button class="menu-item" type="button" data-act="export">Экспорт</button>
+  </nav>
+</div>
 
-<header class="hero">
-  <div class="hero-inner">
-    <p class="eyebrow mono"><span id="eyebrow1" class="editable"></span><span class="sep"> · </span><span id="eyebrow2" class="editable"></span></p>
-    <h1 id="page-title" class="editable"></h1>
-    <p id="dates" class="dates mono editable"></p>
-    <p id="subtitle" class="subtitle editable"></p>
-  </div>
+<input type="file" id="import-file" accept=".json,application/json" hidden>
+<input type="file" id="stop-photo-file" accept="image/*" hidden>
+
+<header class="topbar">
+  <p class="eyebrow mono"><span id="eyebrow1" class="editable"></span><span class="sep"> · </span><span id="eyebrow2" class="editable"></span></p>
+  <h1 id="page-title" class="editable"></h1>
+  <p id="dates" class="dates mono editable"></p>
+  <p id="subtitle" class="subtitle editable"></p>
 </header>
 
 <main>
-  <section class="section edit-only" id="bg-panel-section">
-    <h2 class="section-title">Фон города</h2>
-    <div class="card bg-panel">
-      <input type="url" id="bg-url" placeholder="https://… прямая ссылка на изображение">
-      <button id="bg-apply-url" class="pill" type="button">Применить URL</button>
-      <button id="bg-upload" class="pill" type="button">Загрузить файл</button>
-      <button id="bg-default" class="pill" type="button">Стандартный фон</button>
-      <input type="file" id="bg-file" accept="image/*" hidden>
-    </div>
+  <section class="section" id="schedule">
+    <div id="day-tabs" class="day-tabs"></div>
+    <div id="day-head"></div>
+    <div id="stops"></div>
+    <button id="add-stop" class="pill edit-only" type="button">＋ Добавить событие</button>
   </section>
 
-  <section class="section">
-    <h2 class="section-title">Маршрут по дням</h2>
-    <div id="days"></div>
-    <button id="add-day" class="pill edit-only" type="button">＋ Добавить день</button>
-  </section>
-
-  <section class="section">
+  <section class="section" id="map-section">
     <h2 class="section-title">Точки на карте</h2>
     <div id="map"></div>
     <div id="chips" class="chips"></div>
@@ -80,8 +73,20 @@
       </div>
     </div>
   </section>
+
+  <section class="section" id="settings-section" hidden>
+    <h2 class="section-title">Настройки · Фон города</h2>
+    <div class="card bg-panel">
+      <input type="url" id="bg-url" placeholder="https://… прямая ссылка на изображение">
+      <button id="bg-apply-url" class="pill" type="button">Применить URL</button>
+      <button id="bg-upload" class="pill" type="button">Загрузить файл</button>
+      <button id="bg-default" class="pill" type="button">Убрать фон</button>
+      <input type="file" id="bg-file" accept="image/*" hidden>
+    </div>
+  </section>
 </main>
 
+<button id="edit-fab" class="fab" type="button">✎ Править</button>
 <div id="edit-banner" class="edit-only" role="status">Режим редактирования: кликните на любой текст, чтобы изменить · кликните по карте, чтобы добавить точку</div>
 
 <script src="app.js"></script>
