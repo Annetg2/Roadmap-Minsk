@@ -58,7 +58,7 @@ h1{
   width:44px; height:44px;
   background:none; border:none; cursor:pointer;
   display:flex; flex-direction:column; justify-content:center; align-items:flex-end; gap:5px;
-  transition:transform .25s;
+  transition:transform .35s ease;
 }
 #menu-btn span{display:block; width:22px; height:2px; background:var(--accent); border-radius:2px}
 #menu-btn.open{transform:rotate(90deg)}
@@ -68,10 +68,14 @@ h1{
   background:rgba(11,15,22,.45);
   -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
 }
+#menu-overlay:not([hidden]){animation:fadeIn .3s ease}
 .menu{
   position:absolute; top:78px; right:28px;
   display:flex; flex-direction:column; align-items:flex-end; gap:26px;
+  animation:menuIn .45s cubic-bezier(.22,.8,.3,1);
 }
+@keyframes fadeIn{from{opacity:0}}
+@keyframes menuIn{from{opacity:0; transform:translateY(-12px)}}
 .menu-item{
   background:none; border:none; cursor:pointer;
   color:var(--text); font-size:1.05rem; font-weight:600;
@@ -94,6 +98,10 @@ main{max-width:760px; margin:0; padding:14px 20px 150px; display:grid; gap:52px}
   border:1px solid var(--line); border-radius:var(--r-card);
   padding:20px;
 }
+.pill, .day-tab, .ctl, .chip, .menu-item, .cur, .chevron, .slot{
+  transition:background-color .3s ease, color .3s ease, border-color .3s ease, opacity .3s ease;
+}
+.tl-dot{transition:background-color .35s ease}
 .pill{
   font-size:.85rem; color:var(--text);
   background:rgba(255,255,255,.05);
@@ -145,8 +153,13 @@ main{max-width:760px; margin:0; padding:14px 20px 150px; display:grid; gap:52px}
 body.editing .event-head{cursor:default}
 .event-meta{flex:1; min-width:0}
 .stop-time{color:var(--accent); font-family:var(--font-mono); font-size:.85rem}
-.stop-name{font-weight:700; margin-top:2px}
-.stop-note{color:var(--muted); font-size:.85rem; margin-top:2px}
+.stop-name{font-weight:700; margin-top:2px; overflow-wrap:anywhere}
+/* перенос: сохраняем введённые переводы строк и ломаем длинные слова */
+.stop-note{
+  color:var(--muted); font-size:.85rem; margin-top:2px;
+  white-space:pre-wrap; overflow-wrap:anywhere;
+}
+.day-heading, .subtitle, .point-name, h1{overflow-wrap:anywhere}
 .event-headright{display:flex; align-items:center; gap:6px; flex:none}
 .chevron{
   background:none; border:none; cursor:pointer;
@@ -154,7 +167,8 @@ body.editing .event-head{cursor:default}
 }
 .chevron:hover{color:var(--accent)}
 
-.event-body{margin-top:12px; display:grid; gap:12px}
+.event-body{margin-top:12px; display:grid; gap:12px; animation:bodyIn .38s ease}
+@keyframes bodyIn{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:none}}
 .stop-photo{
   width:100%; max-height:320px; object-fit:cover;
   border-radius:12px; border:1px solid var(--line);
@@ -195,8 +209,11 @@ body.editing .event-head{cursor:default}
   background:var(--accent); color:#141414; font-weight:700;
   border:none; border-radius:999px; padding:.85em 1.5em; cursor:pointer;
   box-shadow:0 8px 28px rgba(0,0,0,.5);
+  transition:background-color .4s ease, transform .25s ease;
 }
 .fab:hover{filter:brightness(1.06)}
+.fab:active{transform:scale(.96)}
+.fab.active{background:#7fc47a} /* «✓ Готово» — зелёная */
 
 /* ============ карта ============ */
 #map{
@@ -331,6 +348,45 @@ body.editing .event-head{cursor:default}
   background:rgba(255,255,255,.04); color:var(--text);
   border:1px solid var(--line); border-radius:999px; padding:.5em 1.1em;
 }
+
+/* ============ карты заблокированы до двойного тапа ============ */
+.map-locked::after{
+  content:'двойной тап — включить карту';
+  position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+  z-index:500; pointer-events:none; white-space:nowrap;
+  background:rgba(10,14,22,.78); color:var(--muted);
+  font-family:var(--font-mono); font-size:.7rem;
+  padding:4px 12px; border-radius:999px; border:1px solid var(--line);
+}
+
+/* ============ кадрирование фото ============ */
+#crop-overlay{
+  position:fixed; inset:0; z-index:800;
+  background:rgba(11,15,22,.7);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  display:flex; align-items:center; justify-content:center; padding:16px;
+  animation:fadeIn .3s ease;
+}
+#crop-overlay[hidden]{display:none}
+.crop-box{
+  width:min(480px, 100%);
+  background:#131a28; border:1px solid var(--line); border-radius:var(--r-card);
+  padding:16px; display:grid; gap:14px;
+  animation:bodyIn .35s ease;
+}
+#crop-frame{
+  position:relative; aspect-ratio:16/10; overflow:hidden;
+  border-radius:12px; border:1px solid var(--line);
+  background:var(--ink); touch-action:none; cursor:grab;
+}
+#crop-frame:active{cursor:grabbing}
+#crop-img{
+  position:absolute; top:0; left:0; max-width:none;
+  pointer-events:none; user-select:none; -webkit-user-drag:none;
+}
+#crop-zoom{width:100%; accent-color:var(--accent)}
+.crop-actions{display:flex; justify-content:flex-end; gap:10px}
+.crop-primary{background:var(--accent); color:#141414; border-color:var(--accent); font-weight:600}
 
 /* ============ режим редактирования ============ */
 .edit-only{display:none}

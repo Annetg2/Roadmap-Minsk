@@ -205,6 +205,33 @@ function renderStatics(){
   document.title = state.hero.title || 'Road Map';
 }
 
+/* ---------- блокировка карт до двойного тапа ----------
+   Чтобы при скролле страницы палец не таскал карту случайно:
+   все взаимодействия выключены, двойной тап включает, тап вне карты — снова выключает. */
+const lockedMaps = [];
+function lockMapUntilDblclick(m, elm){
+  const lock = () => {
+    m._active = false;
+    m.dragging.disable(); m.touchZoom.disable(); m.scrollWheelZoom.disable();
+    m.doubleClickZoom.disable(); m.boxZoom.disable(); m.keyboard.disable();
+    elm.classList.add('map-locked');
+  };
+  m.on('dblclick', () => {
+    if(m._active) return;
+    m._active = true;
+    m.dragging.enable(); m.touchZoom.enable(); m.scrollWheelZoom.enable();
+    m.boxZoom.enable(); m.keyboard.enable();
+    elm.classList.remove('map-locked');
+  });
+  lock();
+  lockedMaps.push({m, elm, lock});
+}
+document.addEventListener('pointerdown', e => {
+  lockedMaps.forEach(rec => {
+    if(rec.m._active && !rec.elm.contains(e.target)) rec.lock();
+  });
+}, true);
+
 /* ---------- маркеры Leaflet ---------- */
 function pinIcon(name){
   const root = el('div', 'marker');
@@ -235,9 +262,10 @@ function initMiniMap(elm, stop, coords, ref){
       if(ref.geoInp) ref.geoInp.textContent = stop.geo;
       save();
     };
-    mm.on('click', e => setGeo(e.latlng, true));
+    mm.on('click', e => { if(mm._active) setGeo(e.latlng, true); });
     mk.on('dragend', () => setGeo(mk.getLatLng(), false));
   }
+  lockMapUntilDblclick(mm, elm);
   miniMaps.push(mm);
 }
 
@@ -286,6 +314,9 @@ function renderTabs(){
 function renderDays(){
   miniMaps.forEach(m => m.remove());
   miniMaps = [];
+  for(let i = lockedMaps.length - 1; i >= 0; i--){ // подчистить записи удалённых мини-карт
+    if(!lockedMaps[i].elm.isConnected) lockedMaps.splice(i, 1);
+  }
   const pendingMini = [];
   clampActiveDay();
   renderTabs();
@@ -372,13 +403,17 @@ function renderDays(){
         body.append(img);
         if(editing){
           const tools = el('div', 'photo-tools');
+          const crp = el('button', 'pill small', '✂ Кадрировать');
+          crp.type = 'button';
+          crp.title = 'Кадрировать и масштабировать фото';
+          crp.onclick = () => openCrop(stop);
           const rep = el('button', 'pill small', '📷 Заменить фото');
           rep.type = 'button';
           rep.onclick = () => { pendingPhotoStop = stop; $('#stop-photo-file').click(); };
           const rm = el('button', 'pill small', '✕ Убрать фото');
           rm.type = 'button';
           rm.onclick = () => { stop.photo = ''; save(); renderDays(); };
-          tools.append(rep, rm);
+          tools.append(crp, rep, rm);
           body.append(tools);
         }
       }else if(editing){
@@ -709,10 +744,11 @@ function initMap(){
     map = L.map('map').setView([state.map.lat, state.map.lng], state.map.zoom);
     L.tileLayer(OSM_TILES, {maxZoom:19, attribution:OSM_ATTR}).addTo(map);
     map.on('click', e => {
-      if(!editing) return;
+      if(!editing || !map._active) return; // сначала активируйте карту двойным тапом
       state.points.push({name:'Новая точка', lat:e.latlng.lat, lng:e.latlng.lng});
       save(); renderChips(); renderMarkers();
     });
+    lockMapUntilDblclick(map, $('#map'));
     map.on('moveend zoomend', () => {
       const c = map.getCenter();
       state.map = {lat:c.lat, lng:c.lng, zoom:map.getZoom()};
@@ -853,6 +889,86 @@ $('#add-stop').onclick = () => {
 $('#add-row').onclick = () => {
   state.budget.push({name:'Новая строка', cats:[], amount:0, currency:'RUB'});
   save(); renderBudget();
+};
+
+/* ---------- кадрирование фото ----------
+   Перетаскивание — панорама, ползунок — масштаб; сохранение перерисовывает
+   видимую область кадра в JPEG. */
+const crop = {stop:null, iw:0, ih:0, scale:1, z:1, ox:0, oy:0};
+
+function cropFrameSize(){
+  const f = $('#crop-frame');
+  return {W:f.clientWidth, H:f.clientHeight};
+}
+function layoutCrop(center){
+  const {W, H} = cropFrameSize();
+  const s0 = Math.max(W / crop.iw, H / crop.ih); // базовый масштаб «cover»
+  crop.scale = s0 * crop.z;
+  const dw = crop.iw * crop.scale, dh = crop.ih * crop.scale;
+  if(center){ crop.ox = (W - dw) / 2; crop.oy = (H - dh) / 2; }
+  crop.ox = Math.min(0, Math.max(W - dw, crop.ox)); // кадр всегда покрыт изображением
+  crop.oy = Math.min(0, Math.max(H - dh, crop.oy));
+  const im = $('#crop-img');
+  im.style.width = dw + 'px';
+  im.style.transform = 'translate(' + crop.ox + 'px,' + crop.oy + 'px)';
+}
+function openCrop(stop){
+  const probe = new Image();
+  probe.onload = () => {
+    crop.stop = stop;
+    crop.iw = probe.naturalWidth;
+    crop.ih = probe.naturalHeight;
+    crop.z = 1;
+    $('#crop-img').src = stop.photo;
+    $('#crop-zoom').value = 100;
+    $('#crop-overlay').hidden = false;
+    layoutCrop(true);
+  };
+  probe.src = stop.photo;
+}
+let cropDrag = null;
+$('#crop-frame').addEventListener('pointerdown', e => {
+  cropDrag = {x:e.clientX, y:e.clientY, ox:crop.ox, oy:crop.oy};
+  $('#crop-frame').setPointerCapture(e.pointerId);
+});
+$('#crop-frame').addEventListener('pointermove', e => {
+  if(!cropDrag) return;
+  crop.ox = cropDrag.ox + (e.clientX - cropDrag.x);
+  crop.oy = cropDrag.oy + (e.clientY - cropDrag.y);
+  layoutCrop(false);
+});
+$('#crop-frame').addEventListener('pointerup', () => { cropDrag = null; });
+$('#crop-frame').addEventListener('pointercancel', () => { cropDrag = null; });
+$('#crop-zoom').addEventListener('input', e => {
+  // держим центр кадра на месте при изменении масштаба
+  const {W, H} = cropFrameSize();
+  const cx = (W / 2 - crop.ox) / crop.scale;
+  const cy = (H / 2 - crop.oy) / crop.scale;
+  crop.z = e.target.value / 100;
+  const s0 = Math.max(W / crop.iw, H / crop.ih);
+  crop.scale = s0 * crop.z;
+  crop.ox = W / 2 - cx * crop.scale;
+  crop.oy = H / 2 - cy * crop.scale;
+  layoutCrop(false);
+});
+$('#crop-cancel').onclick = () => { $('#crop-overlay').hidden = true; };
+$('#crop-save').onclick = () => {
+  if(!crop.stop) return;
+  const {W, H} = cropFrameSize();
+  const sx = -crop.ox / crop.scale, sy = -crop.oy / crop.scale;
+  const sw = W / crop.scale, sh = H / crop.scale;
+  const img = new Image();
+  img.onload = () => {
+    const outW = Math.min(800, Math.round(sw));
+    const outH = Math.round(outW * sh / sw);
+    const c = document.createElement('canvas');
+    c.width = outW; c.height = outH;
+    c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
+    crop.stop.photo = c.toDataURL('image/jpeg', 0.8);
+    $('#crop-overlay').hidden = true;
+    save(); renderDays();
+  };
+  img.src = crop.stop.photo;
 };
 
 /* фото события */

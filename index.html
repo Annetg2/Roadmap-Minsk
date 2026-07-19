@@ -86,6 +86,17 @@
   </section>
 </main>
 
+<div id="crop-overlay" hidden>
+  <div class="crop-box">
+    <div id="crop-frame"><img id="crop-img" alt="Кадрирование фото"></div>
+    <input type="range" id="crop-zoom" min="100" max="300" value="100" aria-label="Масштаб">
+    <div class="crop-actions">
+      <button id="crop-cancel" class="pill" type="button">Отмена</button>
+      <button id="crop-save" class="pill crop-primary" type="button">Сохранить</button>
+    </div>
+  </div>
+</div>
+
 <button id="edit-fab" class="fab" type="button">✎ Править</button>
 <div id="edit-banner" class="edit-only" role="status">Режим редактирования: кликните на любой текст, чтобы изменить · кликните по карте, чтобы добавить точку</div>
 
