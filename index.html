@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -21,10 +21,10 @@
 <div id="menu-overlay" hidden>
   <nav class="menu" aria-label="Главное меню">
     <button class="menu-item" type="button" data-act="settings">Настройки</button>
-    <button class="menu-item" type="button" data-act="map">Карта событий</button>
-    <button class="menu-item" type="button" data-act="reset">Сброс</button>
-    <button class="menu-item" type="button" data-act="import">Импорт</button>
-    <button class="menu-item" type="button" data-act="export">Экспорт</button>
+    <button class="menu-item" type="button" data-act="budget" id="mi-budget">Бюджет</button>
+    <button class="menu-item" type="button" data-act="reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/></svg>Сброс</button>
+    <button class="menu-item" type="button" data-act="import"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Импорт</button>
+    <button class="menu-item" type="button" data-act="export"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14V4"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>Экспорт</button>
   </nav>
 </div>
 
@@ -53,8 +53,8 @@
     <div id="points-editor" class="edit-only"></div>
   </section>
 
-  <section class="section">
-    <h2 class="section-title">Бюджет</h2>
+  <section class="section" id="budget-section" hidden>
+    <h1 class="budget-title">Бюджет <span class="budget-rate mono">· 1 BYN = <span id="rate" class="editable"></span> RUB</span></h1>
     <div class="card">
       <div class="table-wrap">
         <table class="budget">
@@ -66,10 +66,10 @@
       </div>
       <button id="add-row" class="pill edit-only" type="button">＋ Добавить строку</button>
       <div id="cat-editor" class="edit-only"></div>
-      <p class="rate mono">Курс: 1 BYN = <span id="rate" class="editable"></span> RUB</p>
-      <div class="totals mono">
-        <div id="total-rub" class="total-main"></div>
-        <div id="total-byn" class="total-sub"></div>
+      <div class="totals-row mono">
+        <button id="budget-toggle" class="ctl" type="button" title="Показать/скрыть остальные строки">⋯</button>
+        <span id="total-rub" class="total-main"></span>
+        <span id="total-byn" class="total-sub"></span>
       </div>
     </div>
   </section>

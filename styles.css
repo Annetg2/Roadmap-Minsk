@@ -81,8 +81,14 @@ h1{
   color:var(--text); font-size:1.05rem; font-weight:600;
   letter-spacing:.14em; text-transform:uppercase;
   padding:2px 0;
+  display:flex; align-items:center; gap:10px;
 }
 .menu-item:hover{color:var(--accent)}
+.menu-item svg{
+  width:18px; height:18px; flex:none;
+  fill:none; stroke:currentColor; stroke-width:2;
+  stroke-linecap:round; stroke-linejoin:round;
+}
 
 /* ============ каркас ============ */
 main{max-width:760px; margin:0; padding:14px 20px 150px; display:grid; gap:52px}
@@ -257,10 +263,10 @@ body.editing .event-head{cursor:default}
 .points-hint{color:var(--muted); font-size:.8rem}
 
 /* маркеры Leaflet (divIcon) */
-.poi{background:none; border:none}
+/* позицию маркера задаёт MapLibre через anchor:'bottom' — свой transform не нужен */
 .marker{
   display:flex; flex-direction:column; align-items:center; gap:3px;
-  transform:translate(-50%,-100%); width:max-content; cursor:pointer;
+  width:max-content; cursor:pointer;
 }
 .marker-label{
   font-size:11px; color:var(--text); background:var(--glass);
@@ -279,18 +285,25 @@ body.editing .event-head{cursor:default}
   border:1px solid var(--line); border-radius:8px; padding:4px 8px;
 }
 
-/* тёмная тема для Leaflet */
-.leaflet-container{background:#131a28; font-family:var(--font-text)}
-.leaflet-popup-content-wrapper, .leaflet-popup-tip{
+/* тёмная тема для MapLibre GL */
+.maplibregl-map{background:#131a28; font-family:var(--font-text)}
+.maplibregl-popup-content{
   background:#131a28; color:var(--text); border:1px solid var(--line);
+  border-radius:10px; padding:10px 12px;
 }
-.leaflet-popup-content{margin:10px 12px}
-.leaflet-bar a{background:#131a28; color:var(--text); border-color:var(--line)}
-.leaflet-bar a:hover{background:#1b2436}
-.leaflet-container .leaflet-control-attribution{
-  background:rgba(10,14,22,.7); color:var(--muted); font-size:10px;
-}
-.leaflet-control-attribution a{color:var(--muted)}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:#131a28}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:#131a28}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:#131a28}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:#131a28}
+.maplibregl-ctrl-group{background:#131a28; border:1px solid var(--line)}
+.maplibregl-ctrl-group button{background:#131a28}
+.maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
+.maplibregl-ctrl-group button:hover{background:#1b2436}
+/* иконки контролов (чёрные SVG) — осветляем под тёмную тему */
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon{filter:invert(1) brightness(1.4)}
+.maplibregl-ctrl-attrib{background:rgba(10,14,22,.7)!important; color:var(--muted)}
+.maplibregl-ctrl-attrib a{color:var(--muted)}
+.maplibregl-ctrl-attrib-button{filter:invert(1)}
 
 /* ============ бюджет ============ */
 .table-wrap{overflow-x:auto}
@@ -312,7 +325,8 @@ body.editing .event-head{cursor:default}
 .cat-toggle.on{opacity:1; filter:none}
 .cat-toggle:hover{opacity:.85}
 #cat-editor{
-  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  /* display управляется .edit-only / body.editing — здесь не задаём, иначе ID перебьёт скрытие */
+  flex-wrap:wrap; align-items:center; gap:10px;
   margin-top:16px; padding-top:14px; border-top:1px solid var(--line);
 }
 .cat-editor-title{color:var(--muted); font-size:.85rem}
@@ -335,10 +349,27 @@ body.editing .event-head{cursor:default}
   padding:2px 10px; cursor:pointer;
 }
 .cur:hover{border-color:var(--accent)}
-.rate{color:var(--muted); font-size:.9rem; margin:18px 0 6px}
 #rate{color:var(--text)}
-.totals{border-top:1px solid var(--line); padding-top:14px; margin-top:8px}
-.total-main{font-size:1.2rem; font-weight:600}
+
+/* страница «Бюджет» */
+.budget-title{
+  font-size:1.7rem; font-weight:700; letter-spacing:-.01em;
+  margin:6px 0 4px; overflow-wrap:anywhere;
+}
+.budget-rate{font-size:.95rem; font-weight:400; color:var(--muted); white-space:nowrap}
+body.page-budget #page-title,
+body.page-budget #dates,
+body.page-budget #subtitle,
+body.page-budget #schedule,
+body.page-budget #map-section,
+body.page-budget #settings-section{display:none}
+
+.totals-row{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  border-top:1px solid var(--line); padding-top:14px; margin-top:8px;
+}
+#budget-toggle{border-radius:999px; width:36px; height:28px; letter-spacing:.05em}
+.total-main{font-size:1.05rem; font-weight:600}
 .total-sub{color:var(--muted)}
 
 /* ============ настройки: фон города ============ */

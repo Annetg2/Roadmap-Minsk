@@ -1,10 +1,30 @@
 /* ======================================================================
-   Карты: Leaflet + OpenStreetMap (бесплатно, без API-ключей).
-   Библиотека подключена в index.html с CDN; без интернета вместо карт
-   показывается заглушка, точки при этом доступны списком-чипами.
+   Карты: MapLibre GL JS + векторный стиль CARTO Dark Matter
+   (бесплатно, без API-ключей). Библиотека подключена в index.html с CDN;
+   без интернета вместо карт показывается заглушка, точки при этом доступны
+   списком-чипами.
+   Важно: состояние хранит координаты как {lat, lng}, а MapLibre везде ждёт
+   [lng, lat] и возвращает {lng, lat} — конвертация только на границе вызовов.
    ====================================================================== */
-const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const OSM_ATTR = '&copy; OpenStreetMap';
+/* спутниковые снимки Esri World Imagery + слой подписей (бесплатно, без ключа) */
+const MAP_STYLE = {
+  version: 8,
+  sources: {
+    sat: {
+      type:'raster', tileSize:256, maxzoom:19,
+      tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      attribution:'Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics'
+    },
+    labels: {
+      type:'raster', tileSize:256, maxzoom:19,
+      tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}']
+    }
+  },
+  layers: [
+    {id:'sat', type:'raster', source:'sat'},
+    {id:'labels', type:'raster', source:'labels'}
+  ]
+};
 
 const LS_KEY = 'travel-roadmap-v2';
 
@@ -209,18 +229,23 @@ function renderStatics(){
    Чтобы при скролле страницы палец не таскал карту случайно:
    все взаимодействия выключены, двойной тап включает, тап вне карты — снова выключает. */
 const lockedMaps = [];
+/* набор жестов, которые включаются/выключаются при блокировке карты */
+function lockableHandlers(m){
+  return [m.dragPan, m.scrollZoom, m.doubleClickZoom, m.touchZoomRotate, m.boxZoom, m.keyboard];
+}
 function lockMapUntilDblclick(m, elm){
+  m.dragRotate.disable();              // всегда 2D: без вращения и наклона
+  m.touchZoomRotate.disableRotation();
+  m.touchPitch.disable();
   const lock = () => {
     m._active = false;
-    m.dragging.disable(); m.touchZoom.disable(); m.scrollWheelZoom.disable();
-    m.doubleClickZoom.disable(); m.boxZoom.disable(); m.keyboard.disable();
+    lockableHandlers(m).forEach(h => h && h.disable());
     elm.classList.add('map-locked');
   };
   m.on('dblclick', () => {
     if(m._active) return;
     m._active = true;
-    m.dragging.enable(); m.touchZoom.enable(); m.scrollWheelZoom.enable();
-    m.boxZoom.enable(); m.keyboard.enable();
+    lockableHandlers(m).forEach(h => h && h.enable());
     elm.classList.remove('map-locked');
   });
   lock();
@@ -232,55 +257,45 @@ document.addEventListener('pointerdown', e => {
   });
 }, true);
 
-/* ---------- маркеры Leaflet ---------- */
-function pinIcon(name){
+/* ---------- маркеры MapLibre ---------- */
+/* DOM-элемент маркера (label + pin); позицию задаёт MapLibre через anchor:'bottom' */
+function makeMarkerEl(name){
   const root = el('div', 'marker');
   const label = el('div', 'marker-label', name);
   root.append(label);
   root.append(el('div', 'marker-pin'));
-  const icon = L.divIcon({className:'poi', html:root, iconSize:[0, 0]});
-  icon._labelEl = label; // для живого обновления подписи при переименовании
-  return icon;
+  return {el:root, label};
 }
 
 /* мини-карта события (создавать после вставки элемента в DOM).
    В режиме редактирования: клик по мини-карте или перетаскивание метки
    задаёт координаты события. */
 function initMiniMap(elm, stop, coords, ref){
-  const mm = L.map(elm, {zoomControl:false, scrollWheelZoom:false}).setView(coords, 15);
-  L.tileLayer(OSM_TILES, {maxZoom:19, attribution:OSM_ATTR}).addTo(mm);
-  const icon = pinIcon(stop.name);
-  const mk = L.marker(coords, {icon, draggable:editing}).addTo(mm);
+  const center = [coords[1], coords[0]]; // [lat,lng] из состояния → [lng,lat] для MapLibre
+  const mm = new maplibregl.Map({
+    container:elm, style:MAP_STYLE, center, zoom:15,
+    attributionControl:false, dragRotate:false
+  });
+  mm.addControl(new maplibregl.AttributionControl({compact:true}));
+  const {el:mel, label} = makeMarkerEl(stop.name);
+  const mk = new maplibregl.Marker({element:mel, anchor:'bottom', draggable:editing})
+    .setLngLat(center).addTo(mm);
   ref.mm = mm;
   ref.marker = mk;
-  ref.label = icon._labelEl;
+  ref.label = label;
   if(editing){
-    const setGeo = (ll, pan) => {
+    const setGeo = (ll, pan) => { // ll — LngLat {lat, lng}
       stop.geo = ll.lat.toFixed(5) + ', ' + ll.lng.toFixed(5);
-      mk.setLatLng(ll);
+      mk.setLngLat(ll);
       if(pan) mm.panTo(ll);
       if(ref.geoInp) ref.geoInp.textContent = stop.geo;
       save();
     };
-    mm.on('click', e => { if(mm._active) setGeo(e.latlng, true); });
-    mk.on('dragend', () => setGeo(mk.getLatLng(), false));
+    mm.on('click', e => { if(mm._active) setGeo(e.lngLat, true); });
+    mk.on('dragend', () => setGeo(mk.getLngLat(), false));
   }
   lockMapUntilDblclick(mm, elm);
   miniMaps.push(mm);
-}
-
-/* геокодирование названия через Nominatim (OSM, бесплатно) */
-function geocodeStop(stop){
-  const raw = (stop.geo || '').trim();
-  const q = (!raw || parseGeo(raw)) ? (stop.name + ' ' + state.hero.eyebrow2) : raw;
-  fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q))
-    .then(r => r.json())
-    .then(res => {
-      if(!res.length){ alert('Не нашёл место: «' + q + '». Уточните название или введите координаты.'); return; }
-      stop.geo = (+res[0].lat).toFixed(5) + ', ' + (+res[0].lon).toFixed(5);
-      save(); renderDays();
-    })
-    .catch(() => alert('Геокодер недоступен — проверьте интернет.'));
 }
 
 /* ---------- расписание: табы дней и карточки событий ---------- */
@@ -426,7 +441,7 @@ function renderDays(){
 
       // мини-карта
       const coords = parseGeo(stop.geo);
-      if(coords && window.L){
+      if(coords && window.maplibregl){
         const mapDiv = el('div', 'stop-map');
         body.append(mapDiv);
         pendingMini.push({elm:mapDiv, stop, coords, ref:miniRef});
@@ -446,13 +461,13 @@ function renderDays(){
         const geoWrap = el('div', 'stop-geo-wrap');
         geoWrap.append(el('span', null, '📍'));
         const geoInp = editableEl('span', 'stop-geo mono', () => stop.geo || '', v => stop.geo = v.trim());
-        geoInp.title = 'Координаты «53.9316, 27.6462» — или нажмите «Найти»';
+        geoInp.title = 'Введите координаты в формате «53.9316, 27.6462»';
         miniRef.geoInp = geoInp;
         geoInp.addEventListener('blur', () => {
-          const c = parseGeo(stop.geo);
+          const c = parseGeo(stop.geo); // [lat, lng]
           if(c && miniRef.mm){
-            miniRef.marker.setLatLng(c);
-            miniRef.mm.setView(c);
+            miniRef.marker.setLngLat([c[1], c[0]]);
+            miniRef.mm.setCenter([c[1], c[0]]);
           }else if(c && !miniRef.mm){
             renderDays(); // появились координаты — показать мини-карту
           }else if(!c && miniRef.mm && !(stop.geo || '').trim()){
@@ -460,11 +475,21 @@ function renderDays(){
           }
         });
         geoWrap.append(geoInp);
-        const find = el('button', 'pill small', '🔍 Найти');
-        find.type = 'button';
-        find.title = 'Найти координаты по названию места';
-        find.onclick = () => geocodeStop(stop);
-        geoWrap.append(find);
+        const show = el('button', 'pill small', '🔍 Найти');
+        show.type = 'button';
+        show.title = 'Показать введённые координаты на карте';
+        show.onclick = () => {
+          const c = parseGeo(stop.geo); // [lat, lng]
+          if(!c){ alert('Введите координаты в формате «53.9316, 27.6462».'); return; }
+          save();
+          if(miniRef.mm){
+            miniRef.marker.setLngLat([c[1], c[0]]);
+            miniRef.mm.jumpTo({center:[c[1], c[0]], zoom:Math.max(miniRef.mm.getZoom(), 15)});
+          }else{
+            renderDays(); // мини-карты ещё нет — создать по координатам
+          }
+        };
+        geoWrap.append(show);
         body.append(geoWrap);
       }
 
@@ -492,10 +517,22 @@ function badgeEl(name, cls){
   return b;
 }
 
+/* сумма строки в рублях — мера «важности» для свёрнутого вида */
+function rowRub(row){
+  return row.currency === 'BYN' ? row.amount * (state.rate || 1) : row.amount;
+}
+
+let budgetExpanded = false;
+const BUDGET_COLLAPSED_ROWS = 4;
+
 function renderBudget(){
   const tbody = $('#budget-body');
   tbody.textContent = '';
-  state.budget.forEach((row, i) => {
+  // показ по убыванию суммы; свёрнуто — только самые крупные строки
+  const order = state.budget.map((row, i) => ({row, i}))
+    .sort((a, b) => rowRub(b.row) - rowRub(a.row));
+  const shown = (editing || budgetExpanded) ? order : order.slice(0, BUDGET_COLLAPSED_ROWS);
+  shown.forEach(({row, i}) => {
     const tr = el('tr');
 
     const tdName = el('td');
@@ -549,6 +586,12 @@ function renderBudget(){
     tr.append(tdName, tdCat, tdAmt, tdCur, tdDel);
     tbody.append(tr);
   });
+  // кнопка ⋯ рядом с «Итого»: раскрыть/скрыть второстепенные строки
+  const tgl = $('#budget-toggle');
+  const hasHidden = !editing && state.budget.length > BUDGET_COLLAPSED_ROWS;
+  tgl.style.display = hasHidden ? '' : 'none';
+  tgl.textContent = budgetExpanded ? '−' : '⋯';
+  tgl.title = budgetExpanded ? 'Скрыть второстепенные строки' : 'Показать все строки';
   renderTotals();
 }
 
@@ -626,8 +669,9 @@ function renderChips(){
     chip.onclick = () => {
       if(!map) return;
       const z = Math.max(map.getZoom(), 14);
-      if(matchMedia('(prefers-reduced-motion: reduce)').matches) map.setView([p.lat, p.lng], z);
-      else map.flyTo([p.lat, p.lng], z, {duration:.6});
+      const c = [p.lng, p.lat]; // MapLibre: [lng, lat]
+      if(matchMedia('(prefers-reduced-motion: reduce)').matches) map.jumpTo({center:c, zoom:z});
+      else map.flyTo({center:c, zoom:z, duration:600});
     };
     const x = el('span', 'chip-x edit-only', '✕');
     x.title = 'Удалить точку';
@@ -662,8 +706,8 @@ function renderPointsEditor(){
       if(c){
         p.lat = c[0]; p.lng = c[1];
         save();
-        if(markers[i]) markers[i].setLatLng(c);
-        if(map) map.setView(c, Math.max(map.getZoom(), 13));
+        if(markers[i]) markers[i].setLngLat([p.lng, p.lat]);
+        if(map) map.setCenter([p.lng, p.lat]);
       }
       coordsEl.textContent = p.lat.toFixed(4) + ', ' + p.lng.toFixed(4);
     });
@@ -671,7 +715,7 @@ function renderPointsEditor(){
     const controls = el('span', 'point-controls');
     const ctr = el('button', 'ctl', '⌖');
     ctr.type = 'button'; ctr.title = 'Показать на карте';
-    ctr.onclick = () => { if(map) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15)); };
+    ctr.onclick = () => { if(map) map.easeTo({center:[p.lng, p.lat], zoom:Math.max(map.getZoom(), 15)}); };
     const del = el('button', 'ctl danger', '✕');
     del.type = 'button'; del.title = 'Удалить точку';
     del.onclick = () => { state.points.splice(i, 1); save(); renderChips(); renderMarkers(); };
@@ -698,7 +742,7 @@ function mapFallback(){
   m.classList.add('fallback');
   m.textContent = '';
   const box = el('div');
-  box.append(el('p', 'fallback-title', 'Карта недоступна: не загрузилась библиотека Leaflet.'));
+  box.append(el('p', 'fallback-title', 'Карта недоступна: не загрузилась библиотека карт.'));
   box.append(el('p', 'fallback-note', 'Нужен интернет. Точки маршрута сохраняются и доступны в списке под картой.'));
   m.append(box);
 }
@@ -723,34 +767,42 @@ function renderMarkers(){
   markers.forEach(m => m.remove());
   markerLabels = [];
   markers = state.points.map((p, i) => {
-    const icon = pinIcon(p.name);
-    markerLabels.push(icon._labelEl);
-    const m = L.marker([p.lat, p.lng], {icon, draggable:editing});
+    const {el:mel, label} = makeMarkerEl(p.name);
+    markerLabels.push(label);
+    const m = new maplibregl.Marker({element:mel, anchor:'bottom', draggable:editing})
+      .setLngLat([p.lng, p.lat]);
     m.on('dragend', () => {
-      const ll = m.getLatLng();
+      const ll = m.getLngLat(); // {lat, lng}
       p.lat = ll.lat; p.lng = ll.lng;
       save();
       renderPointsEditor(); // обновить координаты в списке
     });
-    if(editing) m.bindPopup(pointForm(p, i));
+    if(editing){
+      m.setPopup(new maplibregl.Popup({closeButton:false, closeOnClick:false, offset:24})
+        .setDOMContent(pointForm(p, i)));
+    }
     m.addTo(map);
     return m;
   });
 }
 
 function initMap(){
-  if(!window.L){ mapFallback(); return; }
+  if(!window.maplibregl){ mapFallback(); return; }
   try{
-    map = L.map('map').setView([state.map.lat, state.map.lng], state.map.zoom);
-    L.tileLayer(OSM_TILES, {maxZoom:19, attribution:OSM_ATTR}).addTo(map);
+    map = new maplibregl.Map({
+      container:'map', style:MAP_STYLE,
+      center:[state.map.lng, state.map.lat], zoom:state.map.zoom, // состояние {lat,lng} → [lng,lat]
+      attributionControl:{compact:true}, dragRotate:false
+    });
+    map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-left');
     map.on('click', e => {
       if(!editing || !map._active) return; // сначала активируйте карту двойным тапом
-      state.points.push({name:'Новая точка', lat:e.latlng.lat, lng:e.latlng.lng});
+      state.points.push({name:'Новая точка', lat:e.lngLat.lat, lng:e.lngLat.lng});
       save(); renderChips(); renderMarkers();
     });
     lockMapUntilDblclick(map, $('#map'));
-    map.on('moveend zoomend', () => {
-      const c = map.getCenter();
+    map.on('moveend', () => {
+      const c = map.getCenter(); // {lat, lng}
       state.map = {lat:c.lat, lng:c.lng, zoom:map.getZoom()};
       save();
     });
@@ -771,12 +823,24 @@ function setEditing(on){
   b.classList.toggle('active', on);
   renderMarkers(); // перетаскивание и попап-форма — только в режиме редактирования
   renderDays();    // слоты фото/карты и интерактивность мини-карт
+  renderBudget();  // в режиме правки видны все строки бюджета
 }
 
 /* ---------- меню ---------- */
 function toggleMenu(open){
   $('#menu-overlay').hidden = !open;
   $('#menu-btn').classList.toggle('open', open);
+}
+
+/* ---------- страницы: расписание ⇄ бюджет ---------- */
+let page = 'home';
+function showPage(p){
+  page = p;
+  document.body.classList.toggle('page-budget', p === 'budget');
+  $('#budget-section').hidden = p !== 'budget';
+  $('#mi-budget').textContent = p === 'budget' ? 'Расписание' : 'Бюджет';
+  window.scrollTo({top:0, behavior:'instant'});
+  if(p === 'home' && map) map.resize(); // карта была скрыта — пересчитать размер
 }
 
 /* ---------- экспорт / импорт / сброс ---------- */
@@ -828,7 +892,7 @@ function renderAll(){
   renderCatEditor();
   renderChips();
   if(map){
-    map.setView([state.map.lat, state.map.lng], state.map.zoom);
+    map.jumpTo({center:[state.map.lng, state.map.lat], zoom:state.map.zoom});
     renderMarkers();
   }
 }
@@ -860,11 +924,12 @@ document.querySelectorAll('.menu-item').forEach(b => {
     toggleMenu(false);
     const act = b.dataset.act;
     if(act === 'settings'){
+      if(page !== 'home') showPage('home'); // настройки живут на главной
       const s = $('#settings-section');
       s.hidden = false;
       s.scrollIntoView({behavior:'smooth', block:'start'});
-    }else if(act === 'map'){
-      $('#map-section').scrollIntoView({behavior:'smooth', block:'start'});
+    }else if(act === 'budget'){
+      showPage(page === 'budget' ? 'home' : 'budget');
     }else if(act === 'reset'){
       resetAll();
     }else if(act === 'import'){
@@ -889,6 +954,10 @@ $('#add-stop').onclick = () => {
 $('#add-row').onclick = () => {
   state.budget.push({name:'Новая строка', cats:[], amount:0, currency:'RUB'});
   save(); renderBudget();
+};
+$('#budget-toggle').onclick = () => {
+  budgetExpanded = !budgetExpanded;
+  renderBudget();
 };
 
 /* ---------- кадрирование фото ----------
