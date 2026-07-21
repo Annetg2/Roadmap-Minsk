@@ -69,13 +69,17 @@ h1{
   -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
 }
 #menu-overlay:not([hidden]){animation:fadeIn .3s ease}
+#menu-overlay.closing{animation:fadeOut .25s ease forwards}
+#menu-overlay.closing .menu{animation:menuOut .25s ease forwards}
 .menu{
   position:absolute; top:78px; right:28px;
   display:flex; flex-direction:column; align-items:flex-end; gap:26px;
   animation:menuIn .45s cubic-bezier(.22,.8,.3,1);
 }
 @keyframes fadeIn{from{opacity:0}}
+@keyframes fadeOut{to{opacity:0}}
 @keyframes menuIn{from{opacity:0; transform:translateY(-12px)}}
+@keyframes menuOut{to{opacity:0; transform:translateY(-12px)}}
 .menu-item{
   background:none; border:none; cursor:pointer;
   color:var(--text); font-size:1.05rem; font-weight:600;
@@ -92,6 +96,7 @@ h1{
 
 /* ============ каркас ============ */
 main{max-width:760px; margin:0; padding:14px 20px 150px; display:grid; gap:52px}
+.section{animation:fadeIn .35s ease}
 .section-title{
   font-size:1rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
   border-left:3px solid var(--accent);
@@ -118,9 +123,11 @@ main{max-width:760px; margin:0; padding:14px 20px 150px; display:grid; gap:52px}
 .pill.small{font-size:.78rem; padding:.35em .9em}
 
 /* ============ табы дней ============ */
+/* полоса табов вылетает за поля колонки — скроллится от края до края экрана */
 .day-tabs{
   display:flex; gap:10px; overflow-x:auto;
-  padding:14px 0 6px; scrollbar-width:none;
+  margin:0 -20px; padding:14px 20px 6px;
+  scrollbar-width:none;
 }
 .day-tabs::-webkit-scrollbar{display:none}
 .day-tab{
@@ -165,16 +172,19 @@ body.editing .event-head{cursor:default}
   color:var(--muted); font-size:.85rem; margin-top:2px;
   white-space:pre-wrap; overflow-wrap:anywhere;
 }
-.day-heading, .subtitle, .point-name, h1{overflow-wrap:anywhere}
+.day-heading, .subtitle, h1{overflow-wrap:anywhere}
 .event-headright{display:flex; align-items:center; gap:6px; flex:none}
 .chevron{
   background:none; border:none; cursor:pointer;
   color:var(--muted); font-size:.85rem; padding:4px 6px; flex:none;
+  transition:transform .35s ease, color .3s ease;
 }
+.chevron.open{transform:rotate(180deg)}
 .chevron:hover{color:var(--accent)}
 
 .event-body{margin-top:12px; display:grid; gap:12px; animation:bodyIn .38s ease}
 @keyframes bodyIn{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:none}}
+@keyframes bodyOut{to{opacity:0; transform:translateY(-6px)}}
 .stop-photo{
   width:100%; max-height:320px; object-fit:cover;
   border-radius:12px; border:1px solid var(--line);
@@ -245,22 +255,8 @@ body.editing .event-head{cursor:default}
   display:inline-flex; align-items:center; gap:6px;
 }
 .chip:hover{border-color:var(--accent)}
-.chip-x{color:var(--danger)}
 
-/* редактор точек (режим редактирования) */
-#points-editor{margin-top:14px}
-.point-row{
-  display:flex; align-items:baseline; gap:10px;
-  background:var(--glass);
-  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
-  border:1px solid var(--line); border-radius:12px;
-  padding:8px 14px; flex-wrap:wrap; row-gap:4px;
-}
-.point-name{font-weight:600}
-.point-coords{color:var(--muted); font-size:.8rem}
-.point-controls{margin-left:auto; display:inline-flex; gap:4px}
-.points-foot{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:4px}
-.points-hint{color:var(--muted); font-size:.8rem}
+.points-hint{color:var(--muted); font-size:.8rem; margin:12px 0 0}
 
 /* маркеры Leaflet (divIcon) */
 /* позицию маркера задаёт MapLibre через anchor:'bottom' — свой transform не нужен */
@@ -277,12 +273,6 @@ body.editing .event-head{cursor:default}
   width:14px; height:14px; border-radius:50% 50% 50% 0;
   background:var(--accent); transform:rotate(-45deg);
   border:2px solid var(--ink);
-}
-.marker-form-inline{display:flex; gap:6px; align-items:center}
-.marker-form-inline input{
-  width:150px; font:inherit; font-size:.85rem;
-  background:var(--ink); color:var(--text);
-  border:1px solid var(--line); border-radius:8px; padding:4px 8px;
 }
 
 /* тёмная тема для MapLibre GL */
@@ -301,9 +291,8 @@ body.editing .event-head{cursor:default}
 .maplibregl-ctrl-group button:hover{background:#1b2436}
 /* иконки контролов (чёрные SVG) — осветляем под тёмную тему */
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon{filter:invert(1) brightness(1.4)}
-.maplibregl-ctrl-attrib{background:rgba(10,14,22,.7)!important; color:var(--muted)}
-.maplibregl-ctrl-attrib a{color:var(--muted)}
-.maplibregl-ctrl-attrib-button{filter:invert(1)}
+/* атрибуция тайлов визуально мешает — скрыта на всех картах */
+.maplibregl-ctrl-attrib{display:none!important}
 
 /* ============ бюджет ============ */
 .table-wrap{overflow-x:auto}
@@ -357,12 +346,30 @@ body.editing .event-head{cursor:default}
   margin:6px 0 4px; overflow-wrap:anywhere;
 }
 .budget-rate{font-size:.95rem; font-weight:400; color:var(--muted); white-space:nowrap}
-body.page-budget #page-title,
-body.page-budget #dates,
-body.page-budget #subtitle,
-body.page-budget #schedule,
-body.page-budget #map-section,
-body.page-budget #settings-section{display:none}
+body.page-budget #page-title, body.page-eat #page-title,
+body.page-budget #dates,      body.page-eat #dates,
+body.page-budget #subtitle,   body.page-eat #subtitle,
+body.page-budget #schedule,   body.page-eat #schedule,
+body.page-budget #map-section,body.page-eat #map-section,
+body.page-budget #settings-section, body.page-eat #settings-section{display:none}
+
+/* ============ страница «Покушац» ============ */
+#eat-list{display:grid}
+.eat-row{border-bottom:1px solid var(--line); padding:4px 2px}
+.eat-row:last-child{border-bottom:none}
+.eat-head{display:flex; align-items:center; gap:10px; cursor:pointer; padding:10px 0}
+body.editing .eat-head{cursor:default}
+.eat-meta{flex:1; min-width:0}
+.eat-name{font-weight:700; overflow-wrap:anywhere}
+.eat-tag{color:var(--muted); font-size:.82rem; margin-top:1px; overflow-wrap:anywhere}
+.eat-body{display:grid; gap:12px; padding:2px 0 16px; animation:bodyIn .38s ease}
+.eat-link{
+  color:var(--accent); font-size:.9rem; text-decoration:none;
+  border-bottom:1px dashed rgba(233,165,63,.4); width:max-content; max-width:100%;
+  overflow-wrap:anywhere;
+}
+.eat-link:hover{border-bottom-style:solid}
+.eat-empty{color:var(--muted); font-size:.9rem; padding:8px 0}
 
 .totals-row{
   display:flex; align-items:center; gap:12px; flex-wrap:wrap;
@@ -442,6 +449,26 @@ body.editing .cat-assigned{display:none}
 body.editing .editable{outline:1px dashed var(--accent); outline-offset:3px; border-radius:3px; cursor:text}
 body.editing .editable:focus{outline-style:solid}
 
+/* ============ панель форматирования (жирный/курсив/ссылка) ============ */
+#fmt-bar{
+  position:fixed; z-index:760;
+  display:flex; gap:2px;
+  background:#131a28; border:1px solid var(--line); border-radius:10px;
+  padding:4px; box-shadow:0 8px 28px rgba(0,0,0,.5);
+  animation:fadeIn .2s ease;
+}
+#fmt-bar[hidden]{display:none}
+#fmt-bar button{
+  background:none; border:none; cursor:pointer;
+  color:var(--text); font-size:.95rem; line-height:1;
+  width:34px; height:32px; border-radius:7px;
+  transition:background-color .25s ease;
+}
+#fmt-bar button:hover{background:rgba(255,255,255,.08)}
+/* форматированный текст в заметках */
+.rich a{color:var(--accent); text-underline-offset:2px}
+.rich b{color:var(--text)}
+
 /* ============ адаптив и доступность ============ */
 @media (min-width:700px){
   .event-body{grid-template-columns:1fr 1fr}
@@ -451,6 +478,7 @@ body.editing .editable:focus{outline-style:solid}
 @media (min-width:900px){
   .topbar{padding:36px 48px 4px}
   main{padding:14px 48px 150px}
+  .day-tabs{margin:0 -48px; padding:14px 48px 6px}
   #menu-btn{top:34px; right:28px}
   .menu{top:92px; right:44px}
 }

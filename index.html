@@ -22,6 +22,7 @@
   <nav class="menu" aria-label="Главное меню">
     <button class="menu-item" type="button" data-act="settings">Настройки</button>
     <button class="menu-item" type="button" data-act="budget" id="mi-budget">Бюджет</button>
+    <button class="menu-item" type="button" data-act="eat" id="mi-eat">Покушац</button>
     <button class="menu-item" type="button" data-act="reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/></svg>Сброс</button>
     <button class="menu-item" type="button" data-act="import"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Импорт</button>
     <button class="menu-item" type="button" data-act="export"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14V4"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>Экспорт</button>
@@ -50,7 +51,15 @@
     <h2 class="section-title">Точки на карте</h2>
     <div id="map"></div>
     <div id="chips" class="chips"></div>
-    <div id="points-editor" class="edit-only"></div>
+    <p class="points-hint">Точки собираются из событий дня, у которых указаны координаты.</p>
+  </section>
+
+  <section class="section" id="eat-section" hidden>
+    <h1 class="budget-title">Покушац <span class="budget-rate mono">· места, где поесть</span></h1>
+    <div class="card">
+      <div id="eat-list"></div>
+      <button id="add-eat" class="pill edit-only" type="button">＋ Добавить место</button>
+    </div>
   </section>
 
   <section class="section" id="budget-section" hidden>
@@ -97,8 +106,14 @@
   </div>
 </div>
 
+<div id="fmt-bar" hidden>
+  <button type="button" data-cmd="bold" title="Жирный"><b>Ж</b></button>
+  <button type="button" data-cmd="italic" title="Курсив"><i>К</i></button>
+  <button type="button" data-cmd="link" title="Ссылка">🔗</button>
+</div>
+
 <button id="edit-fab" class="fab" type="button">✎ Править</button>
-<div id="edit-banner" class="edit-only" role="status">Режим редактирования: кликните на любой текст, чтобы изменить · кликните по карте, чтобы добавить точку</div>
+<div id="edit-banner" class="edit-only" role="status">Режим редактирования: кликните на любой текст, чтобы изменить · выделите текст заметки — появится панель форматирования</div>
 
 <script src="app.js"></script>
 </body>
