@@ -1241,7 +1241,12 @@ function placeFmtBar(sel){
   const r = sel.getRangeAt(0).getBoundingClientRect();
   const w = fmtBar.offsetWidth, h = fmtBar.offsetHeight;
   fmtBar.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
-  fmtBar.style.top = Math.max(8, r.top - h - 10) + 'px';
+  // под выделением: нативное меню iOS появляется над ним — не перекрываем друг друга;
+  // высоту берём по visualViewport, чтобы не уехать под клавиатуру
+  const vh = window.visualViewport ? visualViewport.height : innerHeight;
+  let top = r.bottom + 12;
+  if(top + h > vh - 8) top = Math.max(8, r.top - h - 12);
+  fmtBar.style.top = top + 'px';
 }
 document.addEventListener('selectionchange', () => {
   const sel = fmtSelection();
@@ -1253,7 +1258,12 @@ document.addEventListener('selectionchange', () => {
   }
   placeFmtBar(sel);
 });
-addEventListener('scroll', () => { fmtBar.hidden = true; }, {passive:true});
+addEventListener('scroll', () => {
+  // iOS прокручивает страницу при выделении/клавиатуре — двигаем меню за выделением
+  if(fmtBar.hidden) return;
+  const sel = fmtSelection();
+  if(sel) placeFmtBar(sel); else fmtBar.hidden = true;
+}, {passive:true});
 fmtBar.querySelectorAll('button').forEach(b => {
   b.addEventListener('pointerdown', e => e.preventDefault()); // не сбрасывать выделение
 });
@@ -1268,15 +1278,44 @@ fmtSub.querySelectorAll('button').forEach(b => {
   b.onclick = () => {
     if(!fmtSelection()) return;
     if(b.dataset.cmd === 'link'){
-      let u = prompt('Ссылка (URL):', 'https://');
-      if(!u || u === 'https://') return;
-      if(!/^https?:\/\//i.test(u)) u = 'https://' + u;
-      document.execCommand('createLink', false, u);
+      openLinkDialog(); // prompt() в iOS-PWA не работает — своё окно ввода URL
     }else{
       document.execCommand(b.dataset.cmd, false, null); // bold / italic
+      fmtBar.hidden = true;
     }
-    fmtBar.hidden = true;
   };
+});
+
+/* окно ввода ссылки: выделение сохраняем в Range (фокус на поле ввода его сбрасывает),
+   по «Готово» восстанавливаем и оборачиваем выделенное в <a> */
+let linkRange = null;
+function openLinkDialog(){
+  const sel = fmtSelection();
+  if(!sel) return;
+  linkRange = sel.getRangeAt(0).cloneRange();
+  fmtBar.hidden = true;
+  $('#link-url').value = '';
+  $('#link-overlay').hidden = false;
+  $('#link-url').focus();
+}
+$('#link-cancel').onclick = () => {
+  $('#link-overlay').hidden = true;
+  linkRange = null;
+};
+$('#link-save').onclick = () => {
+  let u = $('#link-url').value.trim();
+  $('#link-overlay').hidden = true;
+  if(!u || !linkRange) return;
+  if(!/^https?:\/\//i.test(u)) u = 'https://' + u;
+  const sel = document.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(linkRange);
+  document.execCommand('createLink', false, u); // input-событие поля сохранит состояние
+  linkRange = null;
+  sel.removeAllRanges();
+};
+$('#link-url').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); $('#link-save').click(); }
 });
 
 /* фон города (Настройки) */

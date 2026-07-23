@@ -398,15 +398,22 @@ body.editing .eat-head{cursor:default}
   padding:4px 12px; border-radius:999px; border:1px solid var(--line);
 }
 
-/* ============ кадрирование фото ============ */
-#crop-overlay{
+/* ============ модалки: кадрирование фото и ввод ссылки ============ */
+#crop-overlay, #link-overlay{
   position:fixed; inset:0; z-index:800;
   background:rgba(11,15,22,.7);
   -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
   display:flex; align-items:center; justify-content:center; padding:16px;
   animation:fadeIn .3s ease;
 }
-#crop-overlay[hidden]{display:none}
+#crop-overlay[hidden], #link-overlay[hidden]{display:none}
+#link-overlay{align-items:flex-start; padding-top:14vh} /* выше клавиатуры iOS */
+.link-title{margin:0; font-weight:600}
+#link-url{
+  font:inherit; font-size:.95rem; width:100%;
+  background:rgba(255,255,255,.04); color:var(--text);
+  border:1px solid var(--line); border-radius:999px; padding:.6em 1.1em;
+}
 .crop-box{
   width:min(480px, 100%);
   background:#131a28; border:1px solid var(--line); border-radius:var(--r-card);
@@ -486,6 +493,12 @@ body.editing .editable:focus{outline-style:solid}
   .day-tabs{margin:0 -48px; padding:14px 48px 6px}
   #menu-btn{top:34px; right:28px}
   .menu{top:92px; right:44px}
+}
+/* планшеты в альбомной ориентации (iPad ≈1024–1370 CSS px) — колонка шире, карта выше */
+@media (min-width:1000px){
+  .topbar, main{max-width:980px}
+  #map{height:560px}
+  .stop-map{height:260px}
 }
 @media (prefers-reduced-motion:reduce){
   *{transition:none !important; animation:none !important}
