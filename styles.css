@@ -145,10 +145,10 @@ main{max-width:760px; margin:0; padding:14px 20px 150px; display:grid; gap:52px}
 /* ============ таймлайн и карточки событий ============ */
 #stops{position:relative; display:grid; gap:14px; padding-left:30px; margin-top:10px}
 .event-row{position:relative}
-/* линия — сегментами от кружка вниз к следующему кружку, с зазорами (как в макете) */
+/* направляющая (по макету Frame 4.svg): тонкая белая линия 12%, строго по центру кружков */
 .event-row:not(:last-child)::before{
-  content:''; position:absolute; left:-24px; top:40px; bottom:-26px;
-  width:2px; background:var(--accent); opacity:.35;
+  content:''; position:absolute; left:-25px; top:40px; bottom:-26px;
+  width:1px; background:#fff; opacity:.12;
 }
 .tl-dot{
   position:absolute; left:-31px; top:18px;

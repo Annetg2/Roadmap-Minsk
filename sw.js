@@ -1,7 +1,7 @@
 /* Офлайн-кеш приложения. Стратегия «сначала сеть, потом кеш»:
    онлайн всегда свежие файлы, офлайн — последняя рабочая копия.
    Векторные тайлы карты не кешируются (их слишком много). */
-const CACHE = 'roadmap-v6';
+const CACHE = 'roadmap-v7';
 const ASSETS = ['.', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'icon-512.png'];
 
 self.addEventListener('install', e => {
