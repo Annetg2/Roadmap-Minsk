@@ -23,6 +23,7 @@
     <button class="menu-item" type="button" data-act="settings">Настройки</button>
     <button class="menu-item" type="button" data-act="budget" id="mi-budget">Бюджет</button>
     <button class="menu-item" type="button" data-act="eat" id="mi-eat">Покушац</button>
+    <button class="menu-item" type="button" data-act="shop" id="mi-shop">Магазы</button>
     <button class="menu-item" type="button" data-act="reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/></svg>Сброс</button>
     <button class="menu-item" type="button" data-act="import"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Импорт</button>
     <button class="menu-item" type="button" data-act="export"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14V4"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>Экспорт</button>
@@ -59,6 +60,14 @@
     <div class="card">
       <div id="eat-list"></div>
       <button id="add-eat" class="pill edit-only" type="button">＋ Добавить место</button>
+    </div>
+  </section>
+
+  <section class="section" id="shop-section" hidden>
+    <h1 class="budget-title">Магазы <span class="budget-rate mono">· где закупиться</span></h1>
+    <div class="card">
+      <div id="shop-list"></div>
+      <button id="add-shop" class="pill edit-only" type="button">＋ Добавить магазин</button>
     </div>
   </section>
 
@@ -107,9 +116,12 @@
 </div>
 
 <div id="fmt-bar" hidden>
-  <button type="button" data-cmd="bold" title="Жирный"><b>Ж</b></button>
-  <button type="button" data-cmd="italic" title="Курсив"><i>К</i></button>
-  <button type="button" data-cmd="link" title="Ссылка">🔗</button>
+  <button type="button" id="fmt-root">Формат</button>
+  <span id="fmt-sub" hidden>
+    <button type="button" data-cmd="bold" title="Жирный"><b>Bold</b></button>
+    <button type="button" data-cmd="italic" title="Курсив"><i>Italic</i></button>
+    <button type="button" data-cmd="link" title="Ссылка">Link</button>
+  </span>
 </div>
 
 <button id="edit-fab" class="fab" type="button">✎ Править</button>

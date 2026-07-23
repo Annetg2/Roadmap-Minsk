@@ -1,7 +1,7 @@
 /* Офлайн-кеш приложения. Стратегия «сначала сеть, потом кеш»:
    онлайн всегда свежие файлы, офлайн — последняя рабочая копия.
-   Тайлы карты не кешируются (их слишком много). */
-const CACHE = 'roadmap-v1';
+   Векторные тайлы карты не кешируются (их слишком много). */
+const CACHE = 'roadmap-v5';
 const ASSETS = ['.', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -19,7 +19,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if(e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  if(url.hostname.includes('tile.openstreetmap.org')) return; // тайлы — мимо кеша
+  // тайлы карты — мимо кеша (их тысячи)
+  if(url.hostname.includes('arcgisonline.com') || url.hostname.includes('cartocdn.com') || url.hostname.includes('tile.openstreetmap.org')) return;
   const cacheable = url.origin === location.origin ||
     url.hostname.includes('unpkg.com') || url.hostname.includes('fonts.g');
   e.respondWith(

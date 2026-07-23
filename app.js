@@ -1,12 +1,3 @@
-/* ======================================================================
-   Карты: MapLibre GL JS + векторный стиль CARTO Dark Matter
-   (бесплатно, без API-ключей). Библиотека подключена в index.html с CDN;
-   без интернета вместо карт показывается заглушка, точки при этом доступны
-   списком-чипами.
-   Важно: состояние хранит координаты как {lat, lng}, а MapLibre везде ждёт
-   [lng, lat] и возвращает {lng, lat} — конвертация только на границе вызовов.
-   ====================================================================== */
-/* спутниковые снимки Esri World Imagery + слой подписей (бесплатно, без ключа) */
 const MAP_STYLE = {
   version: 8,
   sources: {
@@ -67,6 +58,7 @@ function demoState(){
       {name:'Лидо', tag:'самообслуживание · недорого', url:'', photo:'', geo:'', note:'Драники и национальная кухня'},
       {name:'Зыбицкая', tag:'бары и рестораны · вечером', url:'', photo:'', geo:'', note:''}
     ],
+    shop:[],
     map:{lat:53.9060, lng:27.5615, zoom:12},
     categories:[
       {name:'жильё',   color:'#8fb8d8'},
@@ -97,7 +89,8 @@ function migrateState(s){
     if(!Array.isArray(r.cats)) r.cats = r.cat ? [String(r.cat)] : [];
   });
   if(typeof s.activeDay !== 'number' || s.activeDay < 0) s.activeDay = 0;
-  if(!Array.isArray(s.eat)) s.eat = []; // старые сохранения — без списка «Покушац»
+  if(!Array.isArray(s.eat)) s.eat = [];   // старые сохранения — без списка «Покушац»
+  if(!Array.isArray(s.shop)) s.shop = []; // …и без списка «Магазы»
   return s;
 }
 
@@ -116,16 +109,34 @@ let editing = false;
 let map = null;
 let markers = [];
 let miniMaps = [];
-let eatMaps = [];
 let pendingPhotoStop = null;
 const expandedStops = new WeakSet(); // раскрытые карточки событий (в рамках сессии)
-const expandedEats = new WeakSet();  // раскрытые места «Покушац»
 
 let saveTimer = null;
+let saveWarned = false;
+function doSave(){
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  }catch(e){
+    // переполнение хранилища (обычно из-за фото) — молчать нельзя, иначе правки теряются
+    if(!saveWarned){
+      saveWarned = true;
+      alert('Не удалось сохранить изменения: хранилище браузера переполнено. Удалите несколько фото или фон города — и правки снова будут сохраняться.');
+    }
+  }
+}
 function save(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => localStorage.setItem(LS_KEY, JSON.stringify(state)), 300);
+  saveTimer = setTimeout(doSave, 300);
 }
+/* iOS может закрыть/заморозить страницу раньше отложенного сохранения —
+   при сворачивании или уходе со страницы пишем немедленно */
+addEventListener('pagehide', () => { if(saveTimer) doSave(); });
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'hidden' && saveTimer) doSave();
+});
 
 /* ---------- утилиты ---------- */
 const $ = sel => document.querySelector(sel);
@@ -734,110 +745,125 @@ function renderCatEditor(){
   wrap.append(add);
 }
 
-/* ---------- страница «Покушац»: компактный список мест с раскрытием ---------- */
-function renderEat(){
-  eatMaps.forEach(m => m.remove());
-  eatMaps = [];
-  for(let i = lockedMaps.length - 1; i >= 0; i--){ // подчистить записи удалённых мини-карт
-    if(!lockedMaps[i].elm.isConnected) lockedMaps.splice(i, 1);
-  }
-  const wrap = $('#eat-list');
-  wrap.textContent = '';
-  const pendingMini = [];
-  if(!state.eat.length && !editing){
-    wrap.append(el('p', 'eat-empty', 'Пока пусто — нажмите «Править» и добавьте первое место.'));
-  }
-  state.eat.forEach((pl, i) => {
-    const isOpen = expandedEats.has(pl);
-    const ref = {mm:null, marker:null, label:null, geoInp:null};
-
-    const row = el('div', 'eat-row' + (isOpen ? ' open' : ''));
-    const head = el('div', 'eat-head');
-    const meta = el('div', 'eat-meta');
-    meta.append(editableEl('div', 'eat-name', () => pl.name, v => {
-      pl.name = v;
-      if(ref.label) ref.label.textContent = v; // подпись на мини-карте — сразу
-    }));
-    meta.append(editableEl('div', 'eat-tag', () => pl.tag || '', v => pl.tag = v));
-    head.append(meta);
-
-    const right = el('div', 'event-headright');
-    right.append(rowControls(state.eat, i, renderEat, 'Удалить место?'));
-    const toggle = () => {
-      if(isOpen){
-        expandedEats.delete(pl);
-        chev.classList.remove('open');
-        const bodyEl = row.querySelector('.eat-body');
-        if(bodyEl && !matchMedia('(prefers-reduced-motion: reduce)').matches){
-          bodyEl.style.animation = 'bodyOut .25s ease forwards';
-          bodyEl.addEventListener('animationend', () => renderEat(), {once:true});
-        }else renderEat();
-      }else{
-        expandedEats.add(pl);
-        renderEat();
-      }
-    };
-    const chev = el('button', 'chevron' + (isOpen ? ' open' : ''), '▾');
-    chev.type = 'button';
-    chev.title = isOpen ? 'Свернуть' : 'Развернуть';
-    chev.onclick = e => { e.stopPropagation(); toggle(); };
-    right.append(chev);
-    head.append(right);
-    head.onclick = () => { if(!editing) toggle(); };
-    row.append(head);
-
-    if(isOpen){
-      const body = el('div', 'eat-body');
-
-      body.append(buildPhotoBlock(pl, renderEat));
-
-      // ссылка на сайт/соцсеть
-      if(editing){
-        const urlWrap = el('div', 'stop-geo-wrap');
-        urlWrap.append(el('span', null, '🔗'));
-        const urlInp = editableEl('span', 'stop-geo mono', () => pl.url || '', v => pl.url = v.trim());
-        urlInp.title = 'Вставьте ссылку на сайт или соцсеть (https://…)';
-        urlWrap.append(urlInp);
-        body.append(urlWrap);
-      }else if(pl.url && /^https?:\/\//i.test(pl.url)){
-        const a = el('a', 'eat-link');
-        let label = pl.url;
-        try{ label = new URL(pl.url).hostname.replace(/^www\./, ''); }catch(e){}
-        a.textContent = '🔗 ' + label;
-        a.href = pl.url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        body.append(a);
-      }
-
-      // мини-карта
-      const coords = parseGeo(pl.geo);
-      if(coords && window.maplibregl){
-        const mapDiv = el('div', 'stop-map');
-        body.append(mapDiv);
-        pendingMini.push({elm:mapDiv, stop:pl, coords, ref});
-      }else if(editing){
-        const slot = el('button', 'slot', 'карта · ' + pl.name);
-        slot.type = 'button';
-        slot.title = 'Поставить метку в центре города — дальше уточните кликом или перетаскиванием';
-        slot.onclick = () => {
-          pl.geo = state.map.lat.toFixed(5) + ', ' + state.map.lng.toFixed(5);
-          save(); renderEat();
-        };
-        body.append(slot);
-      }
-
-      if(editing) body.append(buildGeoTools(pl, ref, renderEat));
-
-      // заметка с форматированием
-      body.append(richEl('div', 'stop-note', () => pl.note || '', v => pl.note = v));
-
-      row.append(body);
+/* ---------- страницы-списки («Покушац», «Магазы»): компактный список мест с раскрытием ---------- */
+function makeListPage(listSel, addSel, getList, emptyText){
+  const expanded = new WeakSet(); // раскрытые места (в рамках сессии)
+  const pageMaps = [];            // мини-карты страницы (для remove/resize)
+  function render(){
+    pageMaps.forEach(m => m.remove());
+    pageMaps.length = 0;
+    for(let i = lockedMaps.length - 1; i >= 0; i--){ // подчистить записи удалённых мини-карт
+      if(!lockedMaps[i].elm.isConnected) lockedMaps.splice(i, 1);
     }
-    wrap.append(row);
-  });
-  pendingMini.forEach(p => initMiniMap(p.elm, p.stop, p.coords, p.ref, eatMaps));
+    const wrap = $(listSel);
+    wrap.textContent = '';
+    const pendingMini = [];
+    const list = getList();
+    if(!list.length && !editing){
+      wrap.append(el('p', 'eat-empty', emptyText));
+    }
+    list.forEach((pl, i) => {
+      const isOpen = expanded.has(pl);
+      const ref = {mm:null, marker:null, label:null, geoInp:null};
+
+      const row = el('div', 'eat-row' + (isOpen ? ' open' : ''));
+      const head = el('div', 'eat-head');
+      const meta = el('div', 'eat-meta');
+      meta.append(editableEl('div', 'eat-name', () => pl.name, v => {
+        pl.name = v;
+        if(ref.label) ref.label.textContent = v; // подпись на мини-карте — сразу
+      }));
+      meta.append(editableEl('div', 'eat-tag', () => pl.tag || '', v => pl.tag = v));
+      head.append(meta);
+
+      const right = el('div', 'event-headright');
+      right.append(rowControls(list, i, render, 'Удалить место?'));
+      const toggle = () => {
+        if(isOpen){
+          expanded.delete(pl);
+          chev.classList.remove('open');
+          const bodyEl = row.querySelector('.eat-body');
+          if(bodyEl && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+            bodyEl.style.animation = 'bodyOut .25s ease forwards';
+            bodyEl.addEventListener('animationend', () => render(), {once:true});
+          }else render();
+        }else{
+          expanded.add(pl);
+          render();
+        }
+      };
+      const chev = el('button', 'chevron' + (isOpen ? ' open' : ''), '▾');
+      chev.type = 'button';
+      chev.title = isOpen ? 'Свернуть' : 'Развернуть';
+      chev.onclick = e => { e.stopPropagation(); toggle(); };
+      right.append(chev);
+      head.append(right);
+      head.onclick = () => { if(!editing) toggle(); };
+      row.append(head);
+
+      if(isOpen){
+        const body = el('div', 'eat-body');
+
+        body.append(buildPhotoBlock(pl, render));
+
+        // ссылка на сайт/соцсеть
+        if(editing){
+          const urlWrap = el('div', 'stop-geo-wrap');
+          urlWrap.append(el('span', null, '🔗'));
+          const urlInp = editableEl('span', 'stop-geo mono', () => pl.url || '', v => pl.url = v.trim());
+          urlInp.title = 'Вставьте ссылку на сайт или соцсеть (https://…)';
+          urlWrap.append(urlInp);
+          body.append(urlWrap);
+        }else if(pl.url && /^https?:\/\//i.test(pl.url)){
+          const a = el('a', 'eat-link');
+          let label = pl.url;
+          try{ label = new URL(pl.url).hostname.replace(/^www\./, ''); }catch(e){}
+          a.textContent = '🔗 ' + label;
+          a.href = pl.url;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          body.append(a);
+        }
+
+        // мини-карта
+        const coords = parseGeo(pl.geo);
+        if(coords && window.maplibregl){
+          const mapDiv = el('div', 'stop-map');
+          body.append(mapDiv);
+          pendingMini.push({elm:mapDiv, stop:pl, coords, ref});
+        }else if(editing){
+          const slot = el('button', 'slot', 'карта · ' + pl.name);
+          slot.type = 'button';
+          slot.title = 'Поставить метку в центре города — дальше уточните кликом или перетаскиванием';
+          slot.onclick = () => {
+            pl.geo = state.map.lat.toFixed(5) + ', ' + state.map.lng.toFixed(5);
+            save(); render();
+          };
+          body.append(slot);
+        }
+
+        if(editing) body.append(buildGeoTools(pl, ref, render));
+
+        // заметка с форматированием
+        body.append(richEl('div', 'stop-note', () => pl.note || '', v => pl.note = v));
+
+        row.append(body);
+      }
+      wrap.append(row);
+    });
+    pendingMini.forEach(p => initMiniMap(p.elm, p.stop, p.coords, p.ref, pageMaps));
+  }
+  render.maps = pageMaps;
+  $(addSel).onclick = () => {
+    const pl = {name:'Новое место', tag:'', url:'', photo:'', geo:'', note:''};
+    getList().push(pl);
+    expanded.add(pl);
+    save(); render();
+  };
+  return render;
 }
+const renderEat  = makeListPage('#eat-list',  '#add-eat',  () => state.eat,  'Пока пусто — нажмите «Править» и добавьте первое место.');
+const renderShop = makeListPage('#shop-list', '#add-shop', () => state.shop, 'Пока пусто — нажмите «Править» и добавьте первый магазин.');
 
 /* ---------- точки на карте: собираются из событий активного дня ---------- */
 let dayMarkerRefs = new Map(); // stop → {chip, label} для живого обновления имён
@@ -947,6 +973,7 @@ function setEditing(on){
   renderDays();    // слоты фото/карты и интерактивность мини-карт
   renderBudget();  // в режиме правки видны все строки бюджета
   renderEat();     // слоты и правка мест «Покушац»
+  renderShop();    // …и «Магазы»
 }
 
 /* ---------- меню ---------- */
@@ -966,20 +993,24 @@ function toggleMenu(open){
   }
 }
 
-/* ---------- страницы: расписание ⇄ бюджет ⇄ покушац ---------- */
+/* ---------- страницы: расписание ⇄ бюджет ⇄ покушац ⇄ магазы ---------- */
 let page = 'home';
 function showPage(p){
   page = p;
   document.body.classList.toggle('page-budget', p === 'budget');
   document.body.classList.toggle('page-eat', p === 'eat');
+  document.body.classList.toggle('page-shop', p === 'shop');
   $('#budget-section').hidden = p !== 'budget';
   $('#eat-section').hidden = p !== 'eat';
+  $('#shop-section').hidden = p !== 'shop';
   $('#mi-budget').textContent = p === 'budget' ? 'Расписание' : 'Бюджет';
   $('#mi-eat').textContent = p === 'eat' ? 'Расписание' : 'Покушац';
+  $('#mi-shop').textContent = p === 'shop' ? 'Расписание' : 'Магазы';
   window.scrollTo({top:0, behavior:'instant'});
   // карты, созданные в скрытой секции, имеют нулевой размер — пересчитать
   if(p === 'home' && map){ map.resize(); miniMaps.forEach(m => m.resize()); }
-  if(p === 'eat') eatMaps.forEach(m => m.resize());
+  if(p === 'eat') renderEat.maps.forEach(m => m.resize());
+  if(p === 'shop') renderShop.maps.forEach(m => m.resize());
 }
 
 /* ---------- экспорт / импорт / сброс ---------- */
@@ -1069,6 +1100,8 @@ document.querySelectorAll('.menu-item').forEach(b => {
       showPage(page === 'budget' ? 'home' : 'budget');
     }else if(act === 'eat'){
       showPage(page === 'eat' ? 'home' : 'eat');
+    }else if(act === 'shop'){
+      showPage(page === 'shop' ? 'home' : 'shop');
     }else if(act === 'reset'){
       resetAll();
     }else if(act === 'import'){
@@ -1174,7 +1207,7 @@ $('#crop-save').onclick = () => {
     c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
     crop.stop.photo = c.toDataURL('image/jpeg', 0.8);
     $('#crop-overlay').hidden = true;
-    save(); renderDays(); renderEat(); // фото может быть и у события, и у места
+    save(); renderDays(); renderEat(); renderShop(); // фото может быть у события, места или магазина
   };
   img.src = crop.stop.photo;
 };
@@ -1188,20 +1221,15 @@ $('#stop-photo-file').addEventListener('change', e => {
   pendingPhotoStop = null;
   resizeImage(f, 800, 0.75, dataUrl => {
     stop.photo = dataUrl;
-    save(); renderDays(); renderEat(); // фото может быть и у события, и у места
+    save(); renderDays(); renderEat(); renderShop(); // фото может быть у события, места или магазина
   });
 });
 
-/* добавить место на странице «Покушац» */
-$('#add-eat').onclick = () => {
-  const pl = {name:'Новое место', tag:'', url:'', photo:'', geo:'', note:''};
-  state.eat.push(pl);
-  expandedEats.add(pl);
-  save(); renderEat();
-};
-
-/* ---------- панель форматирования выделенного текста ---------- */
+/* ---------- контекстное меню форматирования (callout как в iOS/Telegram) ----------
+   Выделили текст заметки → «Формат» → Bold / Italic / Link */
 const fmtBar = $('#fmt-bar');
+const fmtRoot = $('#fmt-root');
+const fmtSub = $('#fmt-sub');
 function fmtSelection(){
   const sel = document.getSelection();
   if(!editing || !sel || sel.isCollapsed || !sel.rangeCount) return null;
@@ -1209,18 +1237,34 @@ function fmtSelection(){
   const host = n.nodeType === Node.TEXT_NODE ? n.parentElement : n;
   return host && host.closest && host.closest('.rich') ? sel : null;
 }
-document.addEventListener('selectionchange', () => {
-  const sel = fmtSelection();
-  if(!sel){ fmtBar.hidden = true; return; }
+function placeFmtBar(sel){
   const r = sel.getRangeAt(0).getBoundingClientRect();
-  fmtBar.hidden = false; // показать до замера — иначе размеры нулевые
   const w = fmtBar.offsetWidth, h = fmtBar.offsetHeight;
   fmtBar.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
   fmtBar.style.top = Math.max(8, r.top - h - 10) + 'px';
+}
+document.addEventListener('selectionchange', () => {
+  const sel = fmtSelection();
+  if(!sel){ fmtBar.hidden = true; return; }
+  if(fmtBar.hidden){ // новое выделение — начинаем с первого уровня «Формат»
+    fmtRoot.hidden = false;
+    fmtSub.hidden = true;
+    fmtBar.hidden = false; // показать до замера — иначе размеры нулевые
+  }
+  placeFmtBar(sel);
 });
 addEventListener('scroll', () => { fmtBar.hidden = true; }, {passive:true});
 fmtBar.querySelectorAll('button').forEach(b => {
   b.addEventListener('pointerdown', e => e.preventDefault()); // не сбрасывать выделение
+});
+fmtRoot.onclick = () => {
+  const sel = fmtSelection();
+  if(!sel) return;
+  fmtRoot.hidden = true; // второй уровень: Bold / Italic / Link
+  fmtSub.hidden = false;
+  placeFmtBar(sel);      // ширина меню изменилась — перецентрировать
+};
+fmtSub.querySelectorAll('button').forEach(b => {
   b.onclick = () => {
     if(!fmtSelection()) return;
     if(b.dataset.cmd === 'link'){
